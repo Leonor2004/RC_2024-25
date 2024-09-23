@@ -24,6 +24,10 @@
 #define FLAG OX7E
 #define ADDRESS 0X03
 
+#define FLAG2 0x7E
+#define ADDRESS2 0x01
+#define CONTROL2 0x07
+
 volatile int STOP = FALSE;
 
 int main(int argc, char *argv[])
@@ -106,20 +110,33 @@ int main(int argc, char *argv[])
         }
         
         if(!((buf[0] != FLAG) || (buf[4] != FLAG) || (buf[2] != ADDRESS) || ((buf[1] ^ buf[2]) != buf[3]))){
-        //mandar buffer novo para writer
-    }
+            //mandar buffer novo para writer
+            // Create string to send
+            unsigned char buf2[BUF_SIZE];
+            
+            unsigned char BCC12 = ADDRESS2 ^ CONTROL2;
 
+            buf2[0] = FLAG2;
+            buf2[1] = ADDRESS2;
+            buf2[2] = CONTROL2;
+            buf2[3] = BCC12;
+            buf2[4] = FLAG2; 
+            
+
+            // In non-canonical mode, '\n' does not end the writing.
+            // Test this condition by placing a '\n' in the middle of the buffer.
+            // The whole buffer must be sent even with the '\n'.
+            //buf[5] = '\n';
+
+            int bytes = write(fd, buf2, BUF_SIZE);
+            printf("%d bytes written\n", bytes);    
+
+        }
 
         printf(":%s:%d\n", buf, bytes);
         if (buf[0] == 'z')
             STOP = TRUE;
     }
-
-    
-
-  
-
-
 
     // The while() cycle should be changed in order to respect the specifications
     // of the protocol indicated in the Lab guide
