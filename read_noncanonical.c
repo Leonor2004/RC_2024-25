@@ -21,7 +21,7 @@
 
 #define BUF_SIZE 5
 
-#define FLAG OX7E
+#define FLAG 0X7E
 #define ADDRESS 0X03
 
 #define FLAG2 0x7E
