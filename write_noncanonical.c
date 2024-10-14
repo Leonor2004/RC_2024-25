@@ -1,6 +1,4 @@
 // Write to serial port in non-canonical mode
-//
-// Modified by: Eduardo Nuno Almeida [enalmeida@fe.up.pt]
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -22,14 +20,24 @@
 
 #define BUF_SIZE 5
 #define FLAG 0x7E
-#define ADDRESS 0x03
-#define CONTROL 0x03
+#define ADDRESS_SEND 0x03
+#define CONTROL_SEND 0x03
 
-#define ADDRESS2 0x01
+#define ADDRESS_RECIVE 0x01
+#define CONTROLL_RECIVE 0x07
 
 volatile int STOP = FALSE;
 int alarmEnabled = FALSE;
 int alarmCount = 0;
+
+typedef enum {
+    START_STATE,
+    FLAG_STATE,
+    A_STATE,
+    C_STATE,
+    BCC_STATE,
+    STOP_STATE
+} state_t;
 
 // Alarm function handler
 void alarmHandler(int signal)
@@ -87,7 +95,7 @@ int main(int argc, char *argv[])
   // Set input mode (non-canonical, no echo,...)
   newtio.c_lflag = 0;
   newtio.c_cc[VTIME] = 0; // Inter-character timer unused
-  newtio.c_cc[VMIN] = 5;  // Blocking read until 5 chars received
+  newtio.c_cc[VMIN] = 0;  // Blocking read until 5 chars received
 
   // VTIME e VMIN should be changed in order to protect with a
   // timeout the reception of the following character(s)
@@ -111,11 +119,11 @@ int main(int argc, char *argv[])
   // Create string to send
   unsigned char buf[BUF_SIZE];
   
-  unsigned char BCC1 = ADDRESS ^ CONTROL;
+  unsigned char BCC1 = ADDRESS_SEND ^ CONTROL_SEND;
 
   buf[0] = FLAG;
-  buf[1] = ADDRESS;
-  buf[2] = CONTROL;
+  buf[1] = ADDRESS_SEND;
+  buf[2] = CONTROL_SEND;
   buf[3] = BCC1;
   buf[4] = FLAG;
  
@@ -135,7 +143,7 @@ int main(int argc, char *argv[])
    // Loop for input
    unsigned char buf2[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
 
-   while (STOP == FALSE && alarmCount < 3)
+   /*while (STOP == FALSE && alarmCount < 3)
    {
        
        if (alarmEnabled == FALSE)
@@ -160,7 +168,80 @@ int main(int argc, char *argv[])
        }
        
        printf(":%s:%d\n", buf2, bytes);
-   }
+   }*/
+
+    state_t state = START_STATE;
+    int a_prov = 0;
+    int c_prov = 0;
+
+    while(state != STOP_STATE && alarmCount < 3) {
+
+        if (alarmEnabled == FALSE)
+       {
+           printf("alarme de 3 segundos \n");
+           alarm(3); // Set alarm to be triggered in 3s
+           alarmEnabled = TRUE;
+       }
+
+        unsigned char byte = 0;
+
+        int bytes = read(fd, byte, BUF_SIZE);
+
+        switch (state)
+        {
+        case START_STATE:
+            if(byte == FLAG) {
+                buf2[0] = byte;
+                state = FLAG_STATE;
+            }
+            break;
+        case FLAG_STATE:
+            if(byte == FLAG) {
+                buf2[0] = byte;
+            } else if (byte == ADDRESS_RECIVE) {
+                buf2[1] = byte;
+                a_prov = byte;
+                state = A_STATE;
+            } else {
+                state = START_STATE;
+            }
+            break;
+        case A_STATE:
+            if(byte == FLAG) {
+                buf2[0] = byte;
+                state = FLAG_STATE;
+            } else if (byte == CONTROLL_RECIVE) {
+                buf2[2] = byte;
+                c_prov = byte;
+                state = C_STATE;
+            } else {
+                state = START_STATE;
+            }
+            break;
+        case C_STATE:
+            if(byte == FLAG) {
+                buf2[0] = byte;
+                state = FLAG_STATE;
+            } else if (byte == a_prov ^ c_prov) {
+                buf2[3] = byte;
+                state = BCC_STATE;
+            } else {
+                state = START_STATE;
+            }
+            break;
+        case BCC_STATE:
+            if(byte == FLAG) {
+                buf2[4] = byte;
+                state = STOP_STATE;
+                alarm(0);
+            } else {
+                state = START_STATE;
+            }
+            break;
+        default:
+            break;
+        }
+    }
 
 
   // Restore the old port settings
