@@ -6,18 +6,33 @@
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
+
 ////////////////////////////////////////////////
 // LLOPEN
 ////////////////////////////////////////////////
 int llopen(LinkLayer connectionParameters)
 {
-    if (openSerialPort(connectionParameters.serialPort,
-                       connectionParameters.baudRate) < 0)
-    {
-        return -1;
-    }
+const char *serialPortName = argv[1];
+  int fd = open(serialPortName, O_RDWR | O_NOCTTY);
 
-    // TODO
+  if (fd < 0)
+  {
+      perror(serialPortName);
+      exit(-1);
+  }
+
+  struct termios oldtio;
+  struct termios newtio;
+
+  // Save current port settings
+  if (tcgetattr(fd, &oldtio) == -1)
+  {
+      perror("tcgetattr");
+      exit(-1);
+  }
+
+  // Clear struct for new port settings
+  memset(&newtio, 0, sizeof(newtio));
 
     return 1;
 }
