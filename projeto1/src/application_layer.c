@@ -1,9 +1,10 @@
 // Application layer protocol implementation
 
-#include "application_layer.h"
-#include "link_layer.h"
+#include "../include/application_layer.h"
+#include "../include/link_layer.h"
 
 #include <stdio.h>
+#include <string.h>
 
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename)
@@ -29,7 +30,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     connectionParameters.timeout=timeout;
 
 
-    if (llopen(connectionParameters)!=1) {
+    if (llopen(connectionParameters) != 1) {
         printf("error: llopen failed");
     }
 
@@ -37,16 +38,20 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     switch (connectionParameters.role) {
         case LlTx:
             //TODO
+            //llwrite();
 
             break;
         case LlRx:
             //TODO
+            //llread();
             
             break;
         default:
             printf("error: role unknown");
             return;
     }
+
+    //llclose
 
 
 }
