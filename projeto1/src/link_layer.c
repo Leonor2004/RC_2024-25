@@ -29,8 +29,7 @@ int alarmCount = 0;
 
 
 // Alarm function handler
-void alarmHandler(int signal)
-{
+void alarmHandler(int signal) {
    alarmEnabled = FALSE;
    alarmCount++;
 
@@ -41,8 +40,7 @@ void alarmHandler(int signal)
 ////////////////////////////////////////////////
 // LLOPEN
 ////////////////////////////////////////////////
-int llopen(LinkLayer connectionParameters)
-{
+int llopen(LinkLayer connectionParameters) {
     int fd = openSerialPort(connectionParameters.serialPort, connectionParameters.baudRate);
     if (fd < 0) { return -1;}
 
@@ -273,9 +271,26 @@ int llopen(LinkLayer connectionParameters)
 ////////////////////////////////////////////////
 // LLWRITE
 ////////////////////////////////////////////////
-int llwrite(const unsigned char *buf, int bufSize)
-{
-    // TODO
+int llwrite(const unsigned char *buf, int bufSize) {
+    
+    unsigned int sizeOfFrame = bufSize + 6; // 6 = 2*FLAG + ADDRESS + CONTROL + BCC1 + BCC2
+    unsigned char *frame = (unsigned char *) malloc(sizeOfFrame);
+    frame[0] = FLAG; //flag
+    frame[1] = ADDRESS_SEND; //A = 0X03
+    frame[2] = CONTROL_SEND; //C = 0X03
+    frame[3] = ADDRESS_SEND ^ CONTROL_SEND; // A^C
+    
+    memcpy (frame+4, buf, bufSize); //D1 Dn
+    
+    //TODO
+
+
+    unsigned char BCC2 = buf[0];
+    for (unsigned int i = 1 ; i < bufSize ; i++) { BCC2 = BCC2 ^ buf[i]; } // BCC2 = D1^D2^...^Dn
+
+
+
+   //TODO
 
     return 0;
 }
@@ -283,8 +298,7 @@ int llwrite(const unsigned char *buf, int bufSize)
 ////////////////////////////////////////////////
 // LLREAD
 ////////////////////////////////////////////////
-int llread(unsigned char *packet)
-{
+int llread(unsigned char *packet) {
     // TODO
 
     return 0;
@@ -293,8 +307,7 @@ int llread(unsigned char *packet)
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
-int llclose(int showStatistics)
-{
+int llclose(int showStatistics) {
     // TODO
 
     int clstat = closeSerialPort();
