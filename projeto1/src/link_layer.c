@@ -48,8 +48,6 @@ int llopen(LinkLayer connectionParameters)
 
     switch (connectionParameters.role) {
 
-
-
         case LlTx: //WRITE
             //WRITE ESCREVE
             printf("write vai escrever?\n");
@@ -83,11 +81,11 @@ int llopen(LinkLayer connectionParameters)
             int a_prov1 = 0;
             int c_prov1 = 0;
 
-            while(stateW != STOP_STATE && alarmCount < 3) {
+            while(stateW != STOP_STATE && alarmCount < connectionParameters.nRetransmissions) {
 
                 if (alarmEnabled == FALSE) {
-                    printf("alarme de 3 segundos do write\n");
-                    alarm(3); // Set alarm to be triggered in 3s
+                    printf("alarme do write\n");
+                    alarm(connectionParameters.timeout); // Set alarm to be triggered in 3s
                     alarmEnabled = TRUE;
                 }
 
@@ -170,11 +168,11 @@ int llopen(LinkLayer connectionParameters)
             int a_prov2 = 0;
             int c_prov2 = 0;
 
-            while(stateR != STOP_STATE && alarmCount < 3) {
+            while(stateR != STOP_STATE && alarmCount < connectionParameters.nRetransmissions) {
 
                 if (alarmEnabled == FALSE) {
-                    printf("alarme de 3 segundos do read\n");
-                    alarm(3); // Set alarm to be triggered in 3s
+                    printf("alarme do read\n");
+                    alarm(connectionParameters.timeout); // Set alarm to be triggered in 3s
                     alarmEnabled = TRUE;
                 }
                 sleep(1);
