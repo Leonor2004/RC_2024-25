@@ -19,10 +19,15 @@
 
 #define FLAG 0x7E
 #define ADDRESS_SEND 0x03
-#define CONTROL_SEND 0x03
+#define CONTROL_SET 0x03
 
 #define ADDRESS_RECEIVE 0x01
-#define CONTROL_RECEIVE 0x07
+#define CONTROL_UA 0x07
+
+#define ESCAPE 0x7D
+#define XOR_FLAG 0x5E
+#define XOR_ESCAPE 0x5D
+
 
 int alarmEnabled = FALSE;
 int alarmCount = 0;
@@ -51,10 +56,10 @@ int llopen(LinkLayer connectionParameters) {
             printf("write vai escrever?\n");
             unsigned char bufW[BUF_SIZE];
   
-            unsigned char BCC1W = ADDRESS_SEND ^ CONTROL_SEND;
+            unsigned char BCC1W = ADDRESS_SEND ^ CONTROL_SET;
             bufW[0] = FLAG;
             bufW[1] = ADDRESS_SEND; //0X03
-            bufW[2] = CONTROL_SEND; //0X03
+            bufW[2] = CONTROL_SET; //0X03
             bufW[3] = BCC1W;
             bufW[4] = FLAG;
             printf("write preparou o buffer\n");
@@ -113,7 +118,7 @@ int llopen(LinkLayer connectionParameters) {
                     if(byte == FLAG) {
                         bufW2[0] = byte;
                         stateW = FLAG_STATE;
-                    } else if (byte == CONTROL_RECEIVE) {
+                    } else if (byte == CONTROL_UA) {
                         bufW2[2] = byte;
                         c_prov1 = byte;
                         stateW = C_STATE;
@@ -200,7 +205,7 @@ int llopen(LinkLayer connectionParameters) {
                     if(byte == FLAG) {
                         bufR[0] = byte;
                         stateR = FLAG_STATE;
-                    } else if (byte == CONTROL_SEND) {
+                    } else if (byte == CONTROL_SET) {
                         bufR[2] = byte;
                         c_prov2 = byte;
                         stateR = C_STATE;
@@ -242,10 +247,10 @@ int llopen(LinkLayer connectionParameters) {
             //READ RESPONDE DE VOLTA
             // Create string to send
             unsigned char bufR2[BUF_SIZE];
-            unsigned char BCC1R = ADDRESS_RECEIVE ^ CONTROL_RECEIVE;
+            unsigned char BCC1R = ADDRESS_RECEIVE ^ CONTROL_UA;
             bufR2[0] = FLAG;
             bufR2[1] = ADDRESS_RECEIVE; //0X01
-            bufR2[2] = CONTROL_RECEIVE; //0X07
+            bufR2[2] = CONTROL_UA; //0X07
             bufR2[3] = BCC1R;
             bufR2[4] = FLAG;
             printf("read preparou o buffer: \n");
@@ -277,17 +282,36 @@ int llwrite(const unsigned char *buf, int bufSize) {
     unsigned char *frame = (unsigned char *) malloc(sizeOfFrame);
     frame[0] = FLAG; //flag
     frame[1] = ADDRESS_SEND; //A = 0X03
-    frame[2] = CONTROL_SEND; //C = 0X03
-    frame[3] = ADDRESS_SEND ^ CONTROL_SEND; // A^C
+    frame[2] = CONTROL_SET; //C = 0X03
+    frame[3] = ADDRESS_SEND ^ CONTROL_SET; // A^C
     
     memcpy (frame+4, buf, bufSize); //D1 Dn
     
     //TODO
-
+    int k = 4;
+    for(int i = 0; i < bufSize; i++){
+        if(buf[i] == FLAG){
+            frame[k] = ESCAPE;
+            k++;
+            frame[k] = XOR_FLAG;
+            k++;
+        } else if (buf[i] == ESCAPE) {
+            frame[k] = ESCAPE;
+            k++;
+            frame[k] = XOR_ESCAPE;
+            k++;
+        } else {
+            frame[k] = buf[i];
+            k++;
+        }
+    }
 
     unsigned char BCC2 = buf[0];
     for (unsigned int i = 1 ; i < bufSize ; i++) { BCC2 = BCC2 ^ buf[i]; } // BCC2 = D1^D2^...^Dn
-
+    frame[k] = BCC2;
+    k++;
+    frame[k] = FLAG; //flag
+    k++;
 
 
    //TODO
