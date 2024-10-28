@@ -7,7 +7,7 @@
 #include <string.h>
 
 
-unsigned char * createControlPacket(const char* filename, long int fileSize, unsigned int* controlPacketSize, const unsigned int cField) {
+unsigned char * createControlPacket(const char* filename, int fileSize, unsigned int* controlPacketSize, const unsigned int cField) {
     // The 'log2f' finds the number of bits needed to represent 'fileSize', and dividing by 8 converts bits to bytes.
     // 'ceil' ensures we round up to the nearest whole number of bytes.
     const int L1 = (int) ceil(log2f((float)fileSize)/8.0); // Number of bytes needed to store the file size
@@ -55,6 +55,24 @@ unsigned char * createDataPacket(const char* payload, int payloadSize, int* data
     return packet;
 }
 
+long int analyseControlPacket(unsigned char* packet, int sizePacket, unsigned char *receivedFilename) {
+    
+    unsigned char receivedFilesize;
+    unsigned char L1 = packet [2]; // size of fileSize content
+    unsigned char tempAux[L1]; // Auxiliar array to store the fileSize content
+    memcpy(tempAux, packet+3, L1); // Copy the fileSize content into tempAux
+    
+    for (unsigned char i = 0; i < L1; i++) {
+        receivedFilesize |= (tempAux[L1-i-1] << (8*i));
+    }
+
+    unsigned char L2 = packet[3+L1+1]; // size of filename content
+    *receivedFilename = (unsigned char*) malloc (L2);
+    memcpy(receivedFilename, packet+3+L1+1+1, L2);
+
+    return receivedFilesize;
+}
+
 
 void applicationLayer(const char *serialPort, const char *role, int baudRate, int nTries, int timeout, const char *filename) {
 
@@ -77,7 +95,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
     connectionParameters.nRetransmissions=nTries;
     connectionParameters.timeout=timeout;
 
-    if (llopen(connectionParameters) != 1) {
+    if (llopen(connectionParameters) == -1) {
         printf("error: llopen failed");
         return;
     }
@@ -85,7 +103,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
     switch (connectionParameters.role) {
         case LlTx:
         
-            FILE* file = fopen(filename, "rb");
+            FILE* file = fopen(filename, "rb"); // Open a binary file for reading. (The file must exist.)
             if (file == NULL) {
                 perror("file not found\n");
                 return;
@@ -151,21 +169,50 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
 
             //llclose();
             break;
+
+
         case LlRx:
-            //TODO
-            //llread();
-            // Receive data in packet.
-            /*if (llread(...) == -1) {
-                printf("error: llread failed");
-            } */ 
+
+            unsigned char* packet = (unsigned char* ) malloc(MAX_PAYLOAD_SIZE); // Allocate memory for packet
+            
+            int sizePacket = -1;
+            while (sizePacket == -1) {
+                sizePacket = llread(packet);
+            }
+
+            char* receivedFilename = 0;
+            long int receivedFileSize = analyseControlPacket(packet, sizePacket, &receivedFilename);
+
+            FILE* fileReceived = fopen((char *) receivedFilename, "wb+"); // Open an empty binary file for both reading and writing. (If file exists its contents are destroyed)
+            
+            while(TRUE) {
+                int sizePacket2 = -1;
+                while (sizePacket2 == -1) {
+                    sizePacket2 = llread(packet);
+                }
+                if(sizePacket2 == 0) {break;}
+                else if (packet[0] != 3) {  // If it is not an end control packet
+                    
+                    unsigned char *bufReceived = (unsigned char* ) malloc (sizePacket2);
+
+                    memcpy(bufReceived,packet+4,sizePacket2-4);
+
+                    fwrite(bufReceived, sizeof(unsigned char), sizePacket2-4, fileReceived);
+                    free(bufReceived);
+                }
+                else continue;
+            }
+
+            fclose(fileReceived);
             
             break;
+
+            
         default:
             printf("error: role unknown");
             return;
     }
 
     //llclose 
-
 
 }

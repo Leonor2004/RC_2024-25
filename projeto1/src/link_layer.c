@@ -32,6 +32,18 @@
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 
+LinkLayer connectionParametersCopy;
+int fdCopy;
+
+int Ns = 0;  // Transmiter
+int Nr = 1; // Receiver
+#define CONTROL_I_N0 0x00
+#define CONTROL_I_N1 0x80
+#define CONTROL_RR0  0xAA
+#define CONTROL_RR1  0xAB
+#define CONTROL_REJ0 0x54
+#define CONTROL_REJ1 0x55
+
 
 // Alarm function handler
 void alarmHandler(int signal) {
@@ -48,6 +60,7 @@ void alarmHandler(int signal) {
 int llopen(LinkLayer connectionParameters) {
     int fd = openSerialPort(connectionParameters.serialPort, connectionParameters.baudRate);
     if (fd < 0) { return -1;}
+    connectionParametersCopy = connectionParameters;
 
     switch (connectionParameters.role) {
 
@@ -74,7 +87,7 @@ int llopen(LinkLayer connectionParameters) {
             //WRITE RECEBE DE VOLTA
         
             // Wait until all bytes have been written to the serial port
-            sleep(10);
+            sleep(5);
             (void)signal(SIGALRM, alarmHandler);
 
             // Loop for input
@@ -113,62 +126,62 @@ int llopen(LinkLayer connectionParameters) {
                     
                 }
 
-                unsigned char byte = 0;
+                unsigned char byte;
 
-                read(fd, &byte, 1);
-
-                switch (stateW) {
-                case START_STATE:
-                    if(byte == FLAG) {
-                        bufW2[0] = byte;
-                        stateW = FLAG_STATE;
+                if(read(fd, &byte, 1) > 0){
+                    switch (stateW) {
+                        case START_STATE:
+                            if(byte == FLAG) {
+                                bufW2[0] = byte;
+                                stateW = FLAG_STATE;
+                            }
+                            break;
+                        case FLAG_STATE:
+                            if(byte == FLAG) {
+                                bufW2[0] = byte;
+                            } else if (byte == ADDRESS_RECEIVE) {
+                                bufW2[1] = byte;
+                                a_prov1 = byte;
+                                stateW = A_STATE;
+                            } else {
+                                stateW = START_STATE;
+                            }
+                            break;
+                        case A_STATE:
+                            if(byte == FLAG) {
+                                bufW2[0] = byte;
+                                stateW = FLAG_STATE;
+                            } else if (byte == CONTROL_UA) {
+                                bufW2[2] = byte;
+                                c_prov1 = byte;
+                                stateW = C_STATE;
+                            } else {
+                                stateW = START_STATE;
+                            }
+                            break;
+                        case C_STATE:
+                            if(byte == FLAG) {
+                                bufW2[0] = byte;
+                                stateW = FLAG_STATE;
+                            } else if (byte == (a_prov1 ^ c_prov1)) {
+                                bufW2[3] = byte;
+                                stateW = BCC_STATE;
+                            } else {
+                                stateW = START_STATE;
+                            }
+                            break;
+                        case BCC_STATE:
+                            if(byte == FLAG) {
+                                bufW2[4] = byte;
+                                stateW = STOP_STATE;
+                                alarm(0);
+                            } else {
+                                stateW = START_STATE;
+                            }
+                            break;
+                        default:
+                            break;
                     }
-                    break;
-                case FLAG_STATE:
-                    if(byte == FLAG) {
-                        bufW2[0] = byte;
-                    } else if (byte == ADDRESS_RECEIVE) {
-                        bufW2[1] = byte;
-                        a_prov1 = byte;
-                        stateW = A_STATE;
-                    } else {
-                        stateW = START_STATE;
-                    }
-                    break;
-                case A_STATE:
-                    if(byte == FLAG) {
-                        bufW2[0] = byte;
-                        stateW = FLAG_STATE;
-                    } else if (byte == CONTROL_UA) {
-                        bufW2[2] = byte;
-                        c_prov1 = byte;
-                        stateW = C_STATE;
-                    } else {
-                        stateW = START_STATE;
-                    }
-                    break;
-                case C_STATE:
-                    if(byte == FLAG) {
-                        bufW2[0] = byte;
-                        stateW = FLAG_STATE;
-                    } else if (byte == (a_prov1 ^ c_prov1)) {
-                        bufW2[3] = byte;
-                        stateW = BCC_STATE;
-                    } else {
-                        stateW = START_STATE;
-                    }
-                    break;
-                case BCC_STATE:
-                    if(byte == FLAG) {
-                        bufW2[4] = byte;
-                        stateW = STOP_STATE;
-                        alarm(0);
-                    } else {
-                        stateW = START_STATE;
-                    }
-                    break;
-                default:
-                    break;
                 }
             }
 
@@ -182,7 +195,6 @@ int llopen(LinkLayer connectionParameters) {
 
         case LlRx: //READ
             // READ RECEBE
-
             // Loop for input
             unsigned char bufR[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
 
@@ -191,73 +203,72 @@ int llopen(LinkLayer connectionParameters) {
             int c_prov2 = 0;
 
             while(stateR != STOP_STATE) {
+                unsigned char byte;
 
-                unsigned char byte = 0;
-
-                read(fd, &byte, 1);
-                
-                switch (stateR) {
-                case START_STATE:
-                    if(byte == FLAG) {
-                        bufR[0] = byte;
-                        stateR = FLAG_STATE;
-                    }
-                    break;
-                case FLAG_STATE:
-                    if(byte == FLAG) {
-                        bufR[0] = byte;
-                    } else if (byte == ADDRESS_SEND) {
-                        bufR[1] = byte;
-                        a_prov2 = byte;
-                        stateR = A_STATE;
-                    } else {
-                        stateR = START_STATE;
-                    }
-                    break;
-                case A_STATE:
-                    if(byte == FLAG) {
-                        bufR[0] = byte;
-                        stateR = FLAG_STATE;
-                    } else if (byte == CONTROL_SET) {
-                        bufR[2] = byte;
-                        c_prov2 = byte;
-                        stateR = C_STATE;
-                    } else {
-                        stateR = START_STATE;
-                    }
-                    break;
-                case C_STATE:
-                    if(byte == FLAG) {
-                        bufR[0] = byte;
-                        stateR = FLAG_STATE;
-                    } else if (byte == (a_prov2 ^ c_prov2)) {
-                        bufR[3] = byte;
-                        stateR = BCC_STATE;
-                    } else {
-                        stateR = START_STATE;
-                    }
-                    break;
-                case BCC_STATE:
-                    if(byte == FLAG) {
-                        bufR[4] = byte;
-                        stateR = STOP_STATE;
-                        alarm(0);
-                    } else {
-                        stateR = START_STATE;
-                    }
-                    break;
-                default:
-                    break;
+                if(read(fd, &byte, 1) > 0){
+                    switch (stateR) {
+                        case START_STATE:
+                            if(byte == FLAG) {
+                                bufR[0] = byte;
+                                stateR = FLAG_STATE;
+                            }
+                            break;
+                        case FLAG_STATE:
+                            if(byte == FLAG) {
+                                bufR[0] = byte;
+                            } else if (byte == ADDRESS_SEND) {
+                                bufR[1] = byte;
+                                a_prov2 = byte;
+                                stateR = A_STATE;
+                            } else {
+                                stateR = START_STATE;
+                            }
+                            break;
+                        case A_STATE:
+                            if(byte == FLAG) {
+                                bufR[0] = byte;
+                                stateR = FLAG_STATE;
+                            } else if (byte == CONTROL_SET) {
+                                bufR[2] = byte;
+                                c_prov2 = byte;
+                                stateR = C_STATE;
+                            } else {
+                                stateR = START_STATE;
+                            }
+                            break;
+                        case C_STATE:
+                            if(byte == FLAG) {
+                                bufR[0] = byte;
+                                stateR = FLAG_STATE;
+                            } else if (byte == (a_prov2 ^ c_prov2)) {
+                                bufR[3] = byte;
+                                stateR = BCC_STATE;
+                            } else {
+                                stateR = START_STATE;
+                            }
+                            break;
+                        case BCC_STATE:
+                            if(byte == FLAG) {
+                                bufR[4] = byte;
+                                stateR = STOP_STATE;
+                            } else {
+                                stateR = START_STATE;
+                            }
+                            break;
+                        default:
+                            break;
+                        }
                 }
+                
             }
 
             for (int i = 0; i < 5; i++){
                 printf("var = 0x%02X\n", bufR[i]);
-            } 
-
+            }
 
             //READ RESPONDE DE VOLTA
             // Create string to send
+            printf("read manda de volta\n");
             unsigned char bufR2[BUF_SIZE];
             unsigned char BCC1R = ADDRESS_RECEIVE ^ CONTROL_UA;
             bufR2[0] = FLAG;
@@ -280,7 +291,7 @@ int llopen(LinkLayer connectionParameters) {
             printf("error: role unknown");
             return -1;
     }
-    
+    fdCopy = fd;
     return fd;
 
 }
@@ -294,22 +305,32 @@ int llwrite(const unsigned char *buf, int bufSize) {
     unsigned char *frame = (unsigned char *) malloc(sizeOfFrame);
     frame[0] = FLAG; //flag
     frame[1] = ADDRESS_SEND; //A = 0X03
-    frame[2] = CONTROL_SET; //C = 0X03
+    
+    if (Ns == 0){
+        frame[2] = CONTROL_I_N0; //C = 0x00
+    } else if (Ns == 1) {
+        frame[2] = CONTROL_I_N1; //C = 0x80
+    } else {
+        printf("ERROR: INFO FRAME C\n");
+        return -1;
+    }
+    
     frame[3] = ADDRESS_SEND ^ CONTROL_SET; // A^C
     
-    memcpy (frame+4, buf, bufSize); //D1 Dn
+    memcpy (frame+4, buf, bufSize); //D1...Dn
     
-    //TODO
     int k = 4;
     for(int i = 0; i < bufSize; i++){
-        if(buf[i] == FLAG){
+        if(buf[i] == FLAG){ // se 0x7e -> 0x7d 0x5e
+            frame = realloc(frame,++sizeOfFrame);
             frame[k] = ESCAPE;
             k++;
             frame[k] = XOR_FLAG;
             k++;
-        } else if (buf[i] == ESCAPE) {
+        } else if (buf[i] == ESCAPE) {  // se 0x7d -> 0x7d 0x5dc
+            frame = realloc(frame,++sizeOfFrame);
             frame[k] = ESCAPE;
-            k++;
+            k++; 
             frame[k] = XOR_ESCAPE;
             k++;
         } else {
@@ -325,10 +346,111 @@ int llwrite(const unsigned char *buf, int bufSize) {
     frame[k] = FLAG; //flag
     k++;
 
+    printf("write vai escrever\n");
+    int bytesW = write(fdCopy, frame, k);
+    printf("%d bytes written\n", k);
 
-   //TODO
+    // Loop for input
+    unsigned char bufllwrite[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
 
-    return 0;
+    state_t statellwrite = START_STATE;
+    int a_prov_llwrite = 0;
+    int c_prov_llwrite = 0;
+
+    while(statellwrite != STOP_STATE && alarmCount < connectionParametersCopy.nRetransmissions) {
+
+        if (alarmEnabled == FALSE) {
+            if(alarmCount != 0){
+                printf("write vai escrever de novo\n");
+                int bytesW = write(fdCopy, frame, k);
+                printf("%d bytes written\n", k);
+            }
+            
+            printf("alarme do write\n");
+            alarm(connectionParametersCopy.timeout); // Set alarm to be triggered in Xs
+            alarmEnabled = TRUE;
+        }
+
+        unsigned char byte;
+
+        if(read(fdCopy, &byte, 1) > 0){
+            switch (statellwrite) {
+                case START_STATE:
+                    if(byte == FLAG) {
+                        bufllwrite[0] = byte;
+                        statellwrite = FLAG_STATE;
+                    }
+                    break;
+                case FLAG_STATE:
+                    if(byte == FLAG) {
+                        bufllwrite[0] = byte;
+                    } else if (byte == ADDRESS_RECEIVE) {
+                        bufllwrite[1] = byte;
+                        a_prov_llwrite = byte;
+                        statellwrite = A_STATE;
+                    } else {
+                        statellwrite = START_STATE;
+                    }
+                    break;
+                case A_STATE:
+                    if(byte == FLAG) {
+                        bufllwrite[0] = byte;
+                        statellwrite = FLAG_STATE;
+                    } else if (Ns == 0 && byte == CONTROL_RR1 && Nr == 1) {
+                        bufllwrite[2] = byte;
+                        c_prov_llwrite = byte;
+                        statellwrite = C_STATE;
+                        Ns++;
+                        Nr = 0;
+                    } else if (Ns == 1 && byte == CONTROL_RR0 && Nr == 0) {
+                        bufllwrite[2] = byte;
+                        c_prov_llwrite = byte;
+                        statellwrite = C_STATE;
+                        Ns = 0;
+                        Nr++;
+                    } else if (Ns == 0 && byte == CONTROL_REJ0 && Nr == 1) {
+                        statellwrite = START_STATE;
+                        alarmEnabled == FALSE;
+                    } else if (Ns == 1 && byte == CONTROL_REJ1 && Nr == 0) {
+                        statellwrite = START_STATE;
+                        alarmEnabled == FALSE;
+                    } else {
+                        statellwrite = START_STATE;
+                    }
+                    break;
+                case C_STATE:
+                    if(byte == FLAG) {
+                        bufllwrite[0] = byte;
+                        statellwrite = FLAG_STATE;
+                    } else if (byte == (a_prov_llwrite ^ c_prov_llwrite)) {
+                        bufllwrite[3] = byte;
+                        statellwrite = BCC_STATE;
+                    } else {
+                       statellwrite = START_STATE;
+                    }
+                    break; 
+                case BCC_STATE:
+                    if(byte == FLAG) {
+                        bufllwrite[4] = byte;
+                        statellwrite = STOP_STATE;
+                        alarm(0);
+                    } else {
+                        statellwrite = START_STATE;
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    free(frame);
+    
+    if(statellwrite == STOP_STATE) {return sizeOfFrame;} // correto
+
+    // errado
+    //llclose
+    return -1;
 }
 
 ////////////////////////////////////////////////
