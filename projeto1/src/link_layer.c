@@ -33,7 +33,6 @@ int alarmEnabled = FALSE;
 int alarmCount = 0;
 
 LinkLayer connectionParametersCopy;
-int fdCopy;
 
 int Ns = 0;  // Transmiter
 int Nr = 1; // Receiver
@@ -43,6 +42,8 @@ int Nr = 1; // Receiver
 #define CONTROL_RR1  0xAB
 #define CONTROL_REJ0 0x54
 #define CONTROL_REJ1 0x55
+
+#define CONTROL_DISC 0x0B
 
 
 // Alarm function handler
@@ -81,7 +82,7 @@ int llopen(LinkLayer connectionParameters) {
             printf("control: 0x%02X\n", bufW[2]);
             printf("bcc: 0x%02X\n", bufW[3]);
             printf("flag: 0x%02X\n", bufW[4]);
-            int bytesW = write(fd, bufW, BUF_SIZE);
+            int bytesW = writeBytesSerialPort(bufW, BUF_SIZE);
             printf("%d bytes written\n", bytesW);
 
             //WRITE RECEBE DE VOLTA
@@ -116,7 +117,7 @@ int llopen(LinkLayer connectionParameters) {
                         printf("control: 0x%02X\n", bufW[2]);
                         printf("bcc: 0x%02X\n", bufW[3]);
                         printf("flag: 0x%02X\n", bufW[4]);
-                        int bytesW = write(fd, bufW, BUF_SIZE);
+                        int bytesW = writeBytesSerialPort(bufW, BUF_SIZE);
                         printf("%d bytes written\n", bytesW);
                     }
                     
@@ -128,7 +129,7 @@ int llopen(LinkLayer connectionParameters) {
 
                 unsigned char byte;
 
-                if(read(fd, &byte, 1) > 0){
+                if(readByteSerialPort(&byte) > 0){
                     switch (stateW) {
                         case START_STATE:
                             if(byte == FLAG) {
@@ -205,7 +206,7 @@ int llopen(LinkLayer connectionParameters) {
             while(stateR != STOP_STATE) {
                 unsigned char byte;
 
-                if(read(fd, &byte, 1) > 0){
+                if(readByteSerialPort(&byte)){
                     switch (stateR) {
                         case START_STATE:
                             if(byte == FLAG) {
@@ -282,7 +283,7 @@ int llopen(LinkLayer connectionParameters) {
             printf("control: 0x%02X\n", bufR2[2]);
             printf("bcc: 0x%02X\n", bufR2[3]);
             printf("flag: 0x%02X\n", bufR2[4]);
-            int bytesR = write(fd, bufR2, BUF_SIZE);
+            int bytesR = writeBytesSerialPort(bufR2, BUF_SIZE);
             printf("%d bytes written\n", bytesR);    
             
             break;
@@ -291,7 +292,6 @@ int llopen(LinkLayer connectionParameters) {
             printf("error: role unknown");
             return -1;
     }
-    fdCopy = fd;
     return fd;
 
 }
@@ -347,8 +347,8 @@ int llwrite(const unsigned char *buf, int bufSize) {
     k++;
 
     printf("write vai escrever\n");
-    int bytesW = write(fdCopy, frame, k);
-    printf("%d bytes written\n", k);
+    int bytesW = writeBytesSerialPort(frame, k);
+    printf("%d bytes written\n", bytesW);
 
     // Loop for input
     unsigned char bufllwrite[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
@@ -362,8 +362,8 @@ int llwrite(const unsigned char *buf, int bufSize) {
         if (alarmEnabled == FALSE) {
             if(alarmCount != 0){
                 printf("write vai escrever de novo\n");
-                int bytesW = write(fdCopy, frame, k);
-                printf("%d bytes written\n", k);
+                int bytesW = writeBytesSerialPort(frame, k);
+                printf("%d bytes written\n", bytesW);
             }
             
             printf("alarme do write\n");
@@ -373,7 +373,7 @@ int llwrite(const unsigned char *buf, int bufSize) {
 
         unsigned char byte;
 
-        if(read(fdCopy, &byte, 1) > 0){
+        if(readByteSerialPort(&byte) > 0){
             switch (statellwrite) {
                 case START_STATE:
                     if(byte == FLAG) {
@@ -410,10 +410,10 @@ int llwrite(const unsigned char *buf, int bufSize) {
                         Nr++;
                     } else if (Ns == 0 && byte == CONTROL_REJ0 && Nr == 1) {
                         statellwrite = START_STATE;
-                        alarmEnabled == FALSE;
+                        alarmEnabled = FALSE;
                     } else if (Ns == 1 && byte == CONTROL_REJ1 && Nr == 0) {
                         statellwrite = START_STATE;
-                        alarmEnabled == FALSE;
+                        alarmEnabled = FALSE;
                     } else {
                         statellwrite = START_STATE;
                     }
@@ -444,12 +444,19 @@ int llwrite(const unsigned char *buf, int bufSize) {
         }
     }
 
+    for (int i = 0; i < 5; i++){
+        printf("var = 0x%02X\n", bufllwrite[i]);
+    }
+
     free(frame);
     
     if(statellwrite == STOP_STATE) {return sizeOfFrame;} // correto
 
-    // errado
-    //llclose
+    /*if(llclose(TRUE) == -1) {
+        printf("error: llclose failed");
+        return -1;
+    }*/
+
     return -1;
 }
 
@@ -457,9 +464,114 @@ int llwrite(const unsigned char *buf, int bufSize) {
 // LLREAD
 ////////////////////////////////////////////////
 int llread(unsigned char *packet) {
-    // TODO
+    
+    // READ RECEBE
+    // Loop for input
 
-    return 0;
+    state_t stateR = START_STATE;
+    int a_prov2 = 0;
+    int c_prov2 = 0;
+    int i = 0;
+
+    while(stateR != STOP_STATE) {
+        unsigned char byte;
+
+        if(readByteSerialPort(&byte) > 0){
+            switch (stateR) {
+                case START_STATE:
+                    if(byte == FLAG) {
+                        stateR = FLAG_STATE;
+                    }
+                    break;
+                case FLAG_STATE:
+                    if(byte == FLAG) {
+                    } else if (byte == ADDRESS_SEND) {
+                        a_prov2 = byte;
+                        stateR = A_STATE;
+                    } else {
+                        stateR = START_STATE;
+                    }
+                    break;
+                case A_STATE:
+                    if(byte == FLAG) {
+                        stateR = FLAG_STATE;
+                    } else if (byte == CONTROL_SET) {
+                        c_prov2 = byte;
+                        stateR = C_STATE;
+                    } else {
+                        stateR = START_STATE;
+                    }
+                    break;
+                case C_STATE:
+                    if(byte == FLAG) {
+                        stateR = FLAG_STATE;
+                    } else if (byte == (a_prov2 ^ c_prov2)) {
+                        stateR = BCC_STATE;
+                    } else {
+                        stateR = START_STATE;
+                    }
+                    break;
+                case BCC_STATE: // DESTUFF AND BCC CHECKING
+                    unsigned char byte2;
+                    if (byte == ESCAPE) {
+                        int teste = -1;
+                        while (teste < 0){
+                            readByteSerialPort(&byte2);
+                        }
+                        if(byte2 == XOR_ESCAPE){
+                            packet[i++] = ESCAPE;
+                        } else if (byte2 == XOR_FLAG) {
+                            packet[i++] = FLAG;
+                        } else {
+                            printf("ERROR: ESCAPE found not stuffed!\n");
+                            return -1;
+                        }
+                    } else if (byte == FLAG) {
+                        unsigned int bcc2 = packet[--i];
+                        packet[i] = '\0';
+
+                        unsigned int bcc_calculo = packet[0];
+                        for(int j = 1 ; j<i ; j++){
+                            bcc_calculo = bcc_calculo ^ packet[j];
+                        }
+
+                        if(bcc2 == bcc_calculo) { // TUDO CORRECTO YAYYYYYYY
+                            stateR = STOP_STATE;
+
+                            //responder :)
+                            if (Nr == 0){ // responder com RR0
+                                unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_RR0, ADDRESS_RECEIVE ^ CONTROL_RR0, FLAG};
+                                writeBytesSerialPort(frame, 5);
+                                Nr = 1;
+                            } else { // responder com RR1
+                                unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_RR1, ADDRESS_RECEIVE ^ CONTROL_RR1, FLAG};
+                                writeBytesSerialPort(frame, 5);
+                                Nr = 0;
+                            }
+                            return i;
+                        } else {
+                            //responder erro :(
+                            if (Nr == 0){ // rejeitar com REJ0
+                                unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_REJ0, ADDRESS_RECEIVE ^ CONTROL_REJ0, FLAG};
+                                writeBytesSerialPort(frame, 5);
+                            } else { // rejeitar com REJ1
+                                unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_REJ1, ADDRESS_RECEIVE ^ CONTROL_REJ1, FLAG};
+                                writeBytesSerialPort(frame, 5);
+                            }
+                        }
+
+                    } else {
+                        packet[i++] = byte;
+                    }
+
+                    break;
+                default:
+                    break;
+                }
+        }
+        
+    }
+    return -1;
 }
 
 ////////////////////////////////////////////////
@@ -467,7 +579,329 @@ int llread(unsigned char *packet) {
 ////////////////////////////////////////////////
 int llclose(int showStatistics) {
     // TODO
+    if(showStatistics == TRUE) {
+        printf("show statistics true yayyyyy\n");
+    }
 
+    switch (connectionParametersCopy.role)
+    {
+    case LlTx: // transmiter
+        //WRITE ESCREVE
+        printf("write vai escrever\n");
+        unsigned char bufW[BUF_SIZE];
+
+        unsigned char BCC1W = ADDRESS_SEND ^ CONTROL_SET;
+        bufW[0] = FLAG;
+        bufW[1] = ADDRESS_SEND; //0X03
+        bufW[2] = CONTROL_DISC; //0x0B
+        bufW[3] = BCC1W;
+        bufW[4] = FLAG;
+        printf("write preparou o buffer\n");
+        printf("flag: 0x%02X\n", bufW[0]);
+        printf("address: 0x%02X\n", bufW[1]);
+        printf("control: 0x%02X\n", bufW[2]);
+        printf("bcc: 0x%02X\n", bufW[3]);
+        printf("flag: 0x%02X\n", bufW[4]);
+        int bytesW = writeBytesSerialPort(bufW, BUF_SIZE);
+        printf("%d bytes written\n", bytesW);
+
+        //WRITE RECEBE DE VOLTA
+    
+        // Wait until all bytes have been written to the serial port
+        sleep(5);
+        (void)signal(SIGALRM, alarmHandler);
+
+        // Loop for input
+        unsigned char bufW2[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
+
+        state_t stateW = START_STATE;
+        int a_prov1 = 0;
+        int c_prov1 = 0;
+
+        while(stateW != STOP_STATE && alarmCount < connectionParametersCopy.nRetransmissions) {
+
+            if (alarmEnabled == FALSE) {
+                if(alarmCount != 0){
+                    printf("write vai escrever de novo\n");
+                    unsigned char bufW[BUF_SIZE];
+
+                    unsigned char BCC1W = ADDRESS_SEND ^ CONTROL_SET;
+                    bufW[0] = FLAG;
+                    bufW[1] = ADDRESS_SEND; //0X03
+                    bufW[2] = CONTROL_DISC; //0x0B
+                    bufW[3] = BCC1W;
+                    bufW[4] = FLAG;
+                    printf("write preparou o buffer\n");
+                    printf("flag: 0x%02X\n", bufW[0]);
+                    printf("address: 0x%02X\n", bufW[1]);
+                    printf("control: 0x%02X\n", bufW[2]);
+                    printf("bcc: 0x%02X\n", bufW[3]);
+                    printf("flag: 0x%02X\n", bufW[4]);
+                    int bytesW = writeBytesSerialPort(bufW, BUF_SIZE);
+                    printf("%d bytes written\n", bytesW);
+                }
+                
+                printf("alarme do write\n");
+                alarm(connectionParametersCopy.timeout); // Set alarm to be triggered in Xs
+                alarmEnabled = TRUE;
+                
+            }
+
+            unsigned char byte;
+
+            if(readByteSerialPort(&byte) > 0){
+                switch (stateW) {
+                    case START_STATE:
+                        if(byte == FLAG) {
+                            bufW2[0] = byte;
+                            stateW = FLAG_STATE;
+                        }
+                        break;
+                    case FLAG_STATE:
+                        if(byte == FLAG) {
+                            bufW2[0] = byte;
+                        } else if (byte == ADDRESS_RECEIVE) {
+                            bufW2[1] = byte;
+                            a_prov1 = byte;
+                            stateW = A_STATE;
+                        } else {
+                            stateW = START_STATE;
+                        }
+                        break;
+                    case A_STATE:
+                        if(byte == FLAG) {
+                            bufW2[0] = byte;
+                            stateW = FLAG_STATE;
+                        } else if (byte == CONTROL_DISC) {
+                            bufW2[2] = byte;
+                            c_prov1 = byte;
+                            stateW = C_STATE;
+                        } else {
+                            stateW = START_STATE;
+                        }
+                        break;
+                    case C_STATE:
+                        if(byte == FLAG) {
+                            bufW2[0] = byte;
+                            stateW = FLAG_STATE;
+                        } else if (byte == (a_prov1 ^ c_prov1)) {
+                            bufW2[3] = byte;
+                            stateW = BCC_STATE;
+                        } else {
+                            stateW = START_STATE;
+                        }
+                        break;
+                    case BCC_STATE:
+                        if(byte == FLAG) {
+                            bufW2[4] = byte;
+                            stateW = STOP_STATE;
+                            alarm(0);
+                            
+                            printf("write vai escrever o UA\n");
+                            unsigned char bufAU[BUF_SIZE];
+
+                            unsigned char BCC1AU = ADDRESS_SEND ^ CONTROL_SET;
+                            bufAU[0] = FLAG;
+                            bufAU[1] = ADDRESS_SEND; //0X03
+                            bufAU[2] = CONTROL_UA; //0X07
+                            bufAU[3] = BCC1AU;
+                            bufAU[4] = FLAG;
+                            printf("write preparou o buffer\n");
+                            printf("flag: 0x%02X\n", bufAU[0]);
+                            printf("address: 0x%02X\n", bufAU[1]);
+                            printf("control: 0x%02X\n", bufAU[2]);
+                            printf("bcc: 0x%02X\n", bufAU[3]);
+                            printf("flag: 0x%02X\n", bufAU[4]);
+                            int bytesAU = writeBytesSerialPort(bufAU, BUF_SIZE);
+                            printf("%d bytes written\n", bytesAU);
+
+
+                        } else {
+                            stateW = START_STATE;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        for (int i = 0; i < 5; i++){
+            printf("var = 0x%02X\n", bufW2[i]);
+        } 
+        
+        if (stateW != STOP_STATE) { return -1;}
+
+        break;
+    case LlRx: //receiver
+
+        // READ RECEBE
+        // Loop for input
+        unsigned char bufR[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
+
+        state_t stateR = START_STATE;
+        int a_prov2 = 0;
+        int c_prov2 = 0;
+
+        while(stateR != STOP_STATE) {
+            unsigned char byte;
+
+            if(readByteSerialPort(&byte)){
+                switch (stateR) {
+                    case START_STATE:
+                        if(byte == FLAG) {
+                            bufR[0] = byte;
+                            stateR = FLAG_STATE;
+                        }
+                        break;
+                    case FLAG_STATE:
+                        if(byte == FLAG) {
+                            bufR[0] = byte;
+                        } else if (byte == ADDRESS_SEND) {
+                            bufR[1] = byte;
+                            a_prov2 = byte;
+                            stateR = A_STATE;
+                        } else {
+                            stateR = START_STATE;
+                        }
+                        break;
+                    case A_STATE:
+                        if(byte == FLAG) {
+                            bufR[0] = byte;
+                            stateR = FLAG_STATE;
+                        } else if (byte == CONTROL_DISC) {
+                            bufR[2] = byte;
+                            c_prov2 = byte;
+                            stateR = C_STATE;
+                        } else {
+                            stateR = START_STATE;
+                        }
+                        break;
+                    case C_STATE:
+                        if(byte == FLAG) {
+                            bufR[0] = byte;
+                            stateR = FLAG_STATE;
+                        } else if (byte == (a_prov2 ^ c_prov2)) {
+                            bufR[3] = byte;
+                            stateR = BCC_STATE;
+                        } else {
+                            stateR = START_STATE;
+                        }
+                        break;
+                    case BCC_STATE:
+                        if(byte == FLAG) {
+                            bufR[4] = byte;
+                            stateR = STOP_STATE;
+                        } else {
+                            stateR = START_STATE;
+                        }
+                        break;
+                    default:
+                        break;
+                    }
+            }
+            
+        }
+
+        for (int i = 0; i < 5; i++){
+            printf("var = 0x%02X\n", bufR[i]);
+        }
+
+        //READ RESPONDE DE VOLTA
+        // Create string to send
+        printf("read manda de volta\n");
+        unsigned char bufR2[BUF_SIZE];
+        unsigned char BCC1R = ADDRESS_RECEIVE ^ CONTROL_UA;
+        bufR2[0] = FLAG;
+        bufR2[1] = ADDRESS_RECEIVE; //0X01
+        bufR2[2] = CONTROL_DISC; //0X0B
+        bufR2[3] = BCC1R;
+        bufR2[4] = FLAG;
+        printf("read preparou o buffer: \n");
+        printf("flag: 0x%02X\n", bufR2[0]);
+        printf("address: 0x%02X\n", bufR2[1]);
+        printf("control: 0x%02X\n", bufR2[2]);
+        printf("bcc: 0x%02X\n", bufR2[3]);
+        printf("flag: 0x%02X\n", bufR2[4]);
+        int bytesR = writeBytesSerialPort(bufR2, BUF_SIZE);
+        printf("%d bytes written\n", bytesR);    
+        
+        stateR = START_STATE;
+        a_prov2 = 0;
+        c_prov2 = 0;
+
+        while(stateR != STOP_STATE) {
+            unsigned char byte;
+
+            if(readByteSerialPort(&byte)){
+                switch (stateR) {
+                    case START_STATE:
+                        if(byte == FLAG) {
+                            bufR[0] = byte;
+                            stateR = FLAG_STATE;
+                        }
+                        break;
+                    case FLAG_STATE:
+                        if(byte == FLAG) {
+                            bufR[0] = byte;
+                        } else if (byte == ADDRESS_SEND) {
+                            bufR[1] = byte;
+                            a_prov2 = byte;
+                            stateR = A_STATE;
+                        } else {
+                            stateR = START_STATE;
+                        }
+                        break;
+                    case A_STATE:
+                        if(byte == FLAG) {
+                            bufR[0] = byte;
+                            stateR = FLAG_STATE;
+                        } else if (byte == CONTROL_UA) {
+                            bufR[2] = byte;
+                            c_prov2 = byte;
+                            stateR = C_STATE;
+                        } else {
+                            stateR = START_STATE;
+                        }
+                        break;
+                    case C_STATE:
+                        if(byte == FLAG) {
+                            bufR[0] = byte;
+                            stateR = FLAG_STATE;
+                        } else if (byte == (a_prov2 ^ c_prov2)) {
+                            bufR[3] = byte;
+                            stateR = BCC_STATE;
+                        } else {
+                            stateR = START_STATE;
+                        }
+                        break;
+                    case BCC_STATE:
+                        if(byte == FLAG) {
+                            bufR[4] = byte;
+                            stateR = STOP_STATE;
+                        } else {
+                            stateR = START_STATE;
+                        }
+                        break;
+                    default:
+                        break;
+                    }
+            }
+            
+        }
+
+        for (int i = 0; i < 5; i++){
+            printf("var = 0x%02X\n", bufR[i]);
+        }
+
+
+        break;
+         
+    default:
+        printf("error: role unknown");
+        return -1;
+    }
+    
     int clstat = closeSerialPort();
     return clstat;
 }

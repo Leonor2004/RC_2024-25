@@ -5,6 +5,11 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+#include <fenv.h>
 
 
 unsigned char * createControlPacket(const char* filename, int fileSize, unsigned int* controlPacketSize, const unsigned int cField) {
@@ -41,7 +46,7 @@ unsigned char * createControlPacket(const char* filename, int fileSize, unsigned
     return packet;
 }
 
-unsigned char * createDataPacket(const char* payload, int payloadSize, int* dataPacketSize, unsigned char sequenceNumber) {
+unsigned char * createDataPacket(unsigned char* payload, int payloadSize, unsigned int* dataPacketSize, unsigned char sequenceNumber) {
     
     *dataPacketSize = 1+1+2+payloadSize; // Data packet total size
     
@@ -55,7 +60,7 @@ unsigned char * createDataPacket(const char* payload, int payloadSize, int* data
     return packet;
 }
 
-long int analyseControlPacket(unsigned char* packet, int sizePacket, unsigned char *receivedFilename) {
+void analyseControlPacket(unsigned char* packet, int sizePacket, char* receivedFilename) {
     
     unsigned char receivedFilesize;
     unsigned char L1 = packet [2]; // size of fileSize content
@@ -67,10 +72,8 @@ long int analyseControlPacket(unsigned char* packet, int sizePacket, unsigned ch
     }
 
     unsigned char L2 = packet[3+L1+1]; // size of filename content
-    *receivedFilename = (unsigned char*) malloc (L2);
+    receivedFilename = (char*) malloc (L2);
     memcpy(receivedFilename, packet+3+L1+1+1, L2);
-
-    return receivedFilesize;
 }
 
 
@@ -167,7 +170,6 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
                 return;
             }  
 
-            //llclose();
             break;
 
 
@@ -180,10 +182,10 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
                 sizePacket = llread(packet);
             }
 
-            char* receivedFilename = 0;
-            long int receivedFileSize = analyseControlPacket(packet, sizePacket, &receivedFilename);
+            char receivedFilename = 0;
+            analyseControlPacket(packet, sizePacket, &receivedFilename);
 
-            FILE* fileReceived = fopen((char *) receivedFilename, "wb+"); // Open an empty binary file for both reading and writing. (If file exists its contents are destroyed)
+            FILE* fileReceived = fopen((char*) &receivedFilename, "wb+"); // Open an empty binary file for both reading and writing. (If file exists its contents are destroyed)
             
             while(TRUE) {
                 int sizePacket2 = -1;
@@ -207,12 +209,15 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
             
             break;
 
-            
+
         default:
             printf("error: role unknown");
             return;
     }
 
-    //llclose 
+    if(llclose(TRUE) == -1) {
+        printf("error: llclose failed");
+        return;
+    }
 
 }
