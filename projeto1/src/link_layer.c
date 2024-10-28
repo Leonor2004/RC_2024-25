@@ -53,7 +53,7 @@ int llopen(LinkLayer connectionParameters) {
 
         case LlTx: //WRITE
             //WRITE ESCREVE
-            printf("write vai escrever?\n");
+            printf("write vai escrever\n");
             unsigned char bufW[BUF_SIZE];
   
             unsigned char BCC1W = ADDRESS_SEND ^ CONTROL_SET;
@@ -87,9 +87,30 @@ int llopen(LinkLayer connectionParameters) {
             while(stateW != STOP_STATE && alarmCount < connectionParameters.nRetransmissions) {
 
                 if (alarmEnabled == FALSE) {
+                    if(alarmCount != 0){
+                        printf("write vai escrever de novo\n");
+                        unsigned char bufW[BUF_SIZE];
+
+                        unsigned char BCC1W = ADDRESS_SEND ^ CONTROL_SET;
+                        bufW[0] = FLAG;
+                        bufW[1] = ADDRESS_SEND; //0X03
+                        bufW[2] = CONTROL_SET; //0X03
+                        bufW[3] = BCC1W;
+                        bufW[4] = FLAG;
+                        printf("write preparou o buffer\n");
+                        printf("flag: 0x%02X\n", bufW[0]);
+                        printf("address: 0x%02X\n", bufW[1]);
+                        printf("control: 0x%02X\n", bufW[2]);
+                        printf("bcc: 0x%02X\n", bufW[3]);
+                        printf("flag: 0x%02X\n", bufW[4]);
+                        int bytesW = write(fd, bufW, BUF_SIZE);
+                        printf("%d bytes written\n", bytesW);
+                    }
+                    
                     printf("alarme do write\n");
-                    alarm(connectionParameters.timeout); // Set alarm to be triggered in 3s
+                    alarm(connectionParameters.timeout); // Set alarm to be triggered in Xs
                     alarmEnabled = TRUE;
+                    
                 }
 
                 unsigned char byte = 0;
@@ -162,8 +183,6 @@ int llopen(LinkLayer connectionParameters) {
         case LlRx: //READ
             // READ RECEBE
 
-            (void)signal(SIGALRM, alarmHandler);
-
             // Loop for input
             unsigned char bufR[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
 
@@ -171,14 +190,8 @@ int llopen(LinkLayer connectionParameters) {
             int a_prov2 = 0;
             int c_prov2 = 0;
 
-            while(stateR != STOP_STATE && alarmCount < connectionParameters.nRetransmissions) {
+            while(stateR != STOP_STATE) {
 
-                if (alarmEnabled == FALSE) {
-                    printf("alarme do read\n");
-                    alarm(connectionParameters.timeout); // Set alarm to be triggered in 3s
-                    alarmEnabled = TRUE;
-                }
-                sleep(1);
                 unsigned char byte = 0;
 
                 read(fd, &byte, 1);
@@ -242,7 +255,6 @@ int llopen(LinkLayer connectionParameters) {
                 printf("var = 0x%02X\n", bufR[i]);
             } 
 
-            if (stateR != STOP_STATE) { return -1;}
 
             //READ RESPONDE DE VOLTA
             // Create string to send
