@@ -197,6 +197,8 @@ int llopen(LinkLayer connectionParameters) {
             printf("\n"); 
             printf("------------------------------------------------------------------------\n");
             
+            alarmEnabled = FALSE;
+            alarmCount = 0;
             if (stateW != STOP_STATE) { return -1;}
 
             break;
@@ -369,6 +371,8 @@ int llwrite(const unsigned char *buf, int bufSize) {
     state_t statellwrite = START_STATE;
     int a_prov_llwrite = 0;
     int c_prov_llwrite = 0;
+    alarmEnabled = FALSE;
+    alarmCount = 0;
 
     while(statellwrite != STOP_STATE && alarmCount < connectionParametersCopy.nRetransmissions) {
 
@@ -471,6 +475,8 @@ int llwrite(const unsigned char *buf, int bufSize) {
 
     free(frame);
     
+    alarmEnabled = FALSE;
+    alarmCount = 0;
     if(statellwrite == STOP_STATE) {return sizeOfFrame;} // correto
 
     return -1;
@@ -670,6 +676,8 @@ int llclose(int showStatistics) {
         // Wait until all bytes have been written to the serial port
         sleep(5);
         (void)signal(SIGALRM, alarmHandler);
+        alarmEnabled = FALSE;
+        alarmCount = 0;
 
         // Loop for input
         unsigned char bufW2[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
@@ -793,7 +801,8 @@ int llclose(int showStatistics) {
         }
 
              
-        
+        alarmEnabled = FALSE;
+        alarmCount = 0;
         if (stateW != STOP_STATE) { return -1;}
 
         break;
