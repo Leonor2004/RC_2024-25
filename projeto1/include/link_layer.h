@@ -10,7 +10,8 @@ typedef enum {
     A_STATE,
     C_STATE,
     BCC_STATE,
-    STOP_STATE
+    STOP_STATE,
+    PRE_STOP_STATE
 } state_t;
 
 typedef enum

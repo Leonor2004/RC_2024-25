@@ -34,8 +34,8 @@ int alarmCount = 0;
 
 LinkLayer connectionParametersCopy;
 
-int Ns = 0;  // Transmiter
-int Nr = 1; // Receiver
+int Ns_t = 0;  // Transmiter
+int Nr_r = 1; // Receiver
 #define CONTROL_I_N0 0x00
 #define CONTROL_I_N1 0x80
 #define CONTROL_RR0  0xAA
@@ -300,22 +300,24 @@ int llopen(LinkLayer connectionParameters) {
 // LLWRITE
 ////////////////////////////////////////////////
 int llwrite(const unsigned char *buf, int bufSize) {
-    
+    printf("Ns = 0x%02X\n", Ns_t);
+    printf("Nr = 0x%02X\n", Nr_r);
+
     unsigned int sizeOfFrame = bufSize + 6; // 6 = 2*FLAG + ADDRESS + CONTROL + BCC1 + BCC2
     unsigned char *frame = (unsigned char *) malloc(sizeOfFrame);
     frame[0] = FLAG; //flag
     frame[1] = ADDRESS_SEND; //A = 0X03
     
-    if (Ns == 0){
+    if (Ns_t == 0){
         frame[2] = CONTROL_I_N0; //C = 0x00
-    } else if (Ns == 1) {
+    } else if (Ns_t == 1) {
         frame[2] = CONTROL_I_N1; //C = 0x80
     } else {
         printf("ERROR: INFO FRAME C\n");
         return -1;
     }
     
-    frame[3] = ADDRESS_SEND ^ CONTROL_SET; // A^C
+    frame[3] = frame[1] ^ frame[2]; // A^C
     
     memcpy (frame+4, buf, bufSize); //D1...Dn
     
@@ -346,10 +348,14 @@ int llwrite(const unsigned char *buf, int bufSize) {
     frame[k] = FLAG; //flag
     k++;
 
-    printf("write vai escrever\n");
+    printf("write vai escrever no llwrite\n");
     int bytesW = writeBytesSerialPort(frame, k);
     printf("%d bytes written\n", bytesW);
+    for (int i = 0; i < k; i++){
+        printf("var = 0x%02X\n", frame[i]);
+    }
 
+    sleep(5);
     // Loop for input
     unsigned char bufllwrite[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
 
@@ -374,6 +380,7 @@ int llwrite(const unsigned char *buf, int bufSize) {
         unsigned char byte;
 
         if(readByteSerialPort(&byte) > 0){
+            printf("write e recebi: 0x%02X\n", byte);
             switch (statellwrite) {
                 case START_STATE:
                     if(byte == FLAG) {
@@ -396,22 +403,22 @@ int llwrite(const unsigned char *buf, int bufSize) {
                     if(byte == FLAG) {
                         bufllwrite[0] = byte;
                         statellwrite = FLAG_STATE;
-                    } else if (Ns == 0 && byte == CONTROL_RR1 && Nr == 1) {
+                    } else if (Ns_t == 0 && byte == CONTROL_RR1 && Nr_r == 1) {
                         bufllwrite[2] = byte;
                         c_prov_llwrite = byte;
                         statellwrite = C_STATE;
-                        Ns++;
-                        Nr = 0;
-                    } else if (Ns == 1 && byte == CONTROL_RR0 && Nr == 0) {
+                        Ns_t++;
+                        Nr_r = 0;
+                    } else if (Ns_t == 1 && byte == CONTROL_RR0 && Nr_r == 0) {
                         bufllwrite[2] = byte;
                         c_prov_llwrite = byte;
                         statellwrite = C_STATE;
-                        Ns = 0;
-                        Nr++;
-                    } else if (Ns == 0 && byte == CONTROL_REJ0 && Nr == 1) {
+                        Ns_t = 0;
+                        Nr_r++;
+                    } else if (Ns_t == 0 && byte == CONTROL_REJ0 && Nr_r == 1) {
                         statellwrite = START_STATE;
                         alarmEnabled = FALSE;
-                    } else if (Ns == 1 && byte == CONTROL_REJ1 && Nr == 0) {
+                    } else if (Ns_t == 1 && byte == CONTROL_REJ1 && Nr_r == 0) {
                         statellwrite = START_STATE;
                         alarmEnabled = FALSE;
                     } else {
@@ -464,10 +471,11 @@ int llwrite(const unsigned char *buf, int bufSize) {
 // LLREAD
 ////////////////////////////////////////////////
 int llread(unsigned char *packet) {
-    
+    printf("Ns = 0x%02X\n", Ns_t);
+    printf("Nr = 0x%02X\n", Nr_r);
     // READ RECEBE
     // Loop for input
-
+    printf("read entrei no llread\n");
     state_t stateR = START_STATE;
     int a_prov2 = 0;
     int c_prov2 = 0;
@@ -477,6 +485,7 @@ int llread(unsigned char *packet) {
         unsigned char byte;
 
         if(readByteSerialPort(&byte) > 0){
+            printf("recebi: 0x%02X\n", byte);
             switch (stateR) {
                 case START_STATE:
                     if(byte == FLAG) {
@@ -484,29 +493,53 @@ int llread(unsigned char *packet) {
                     }
                     break;
                 case FLAG_STATE:
+                    printf("entrei no flag state\n");
                     if(byte == FLAG) {
                     } else if (byte == ADDRESS_SEND) {
                         a_prov2 = byte;
                         stateR = A_STATE;
+                    } else if (byte == 0x00) {
+                        // Ignore and stay
                     } else {
                         stateR = START_STATE;
                     }
                     break;
                 case A_STATE:
+                    printf("entrei no A state\n");
+                    printf("Ns: 0x%02X\n", Ns_t);
+                    printf("byte: 0x%02X\n", byte);
                     if(byte == FLAG) {
                         stateR = FLAG_STATE;
-                    } else if (byte == CONTROL_SET) {
+                    } else if ((Ns_t == 0 && byte == CONTROL_I_N0) || (Ns_t == 1 && byte == CONTROL_I_N1)){
                         c_prov2 = byte;
                         stateR = C_STATE;
+                    } else if (byte == CONTROL_DISC ) {
+                        stateR = PRE_STOP_STATE;
+                        
+                    } else if (byte == 0x00) {
+                        // Ignore and stay
                     } else {
                         stateR = START_STATE;
                     }
                     break;
+                case PRE_STOP_STATE:
+                    if(byte == FLAG) {
+                        stateR = STOP_STATE;
+                        return 5;
+                    } else {
+                        stateR = START_STATE;
+                    }
+                    break;
+                    break;
                 case C_STATE:
+                    printf("entrei no C state\n");
+                    printf("devia ser: 0x%02X\n", (a_prov2 ^ c_prov2));
                     if(byte == FLAG) {
                         stateR = FLAG_STATE;
                     } else if (byte == (a_prov2 ^ c_prov2)) {
                         stateR = BCC_STATE;
+                    } else if (byte == 0x00) {
+                        // Ignore and stay
                     } else {
                         stateR = START_STATE;
                     }
@@ -527,6 +560,7 @@ int llread(unsigned char *packet) {
                             return -1;
                         }
                     } else if (byte == FLAG) {
+                        printf("cheguei a flag, o anterior é o bcc\n");
                         unsigned int bcc2 = packet[--i];
                         packet[i] = '\0';
 
@@ -537,26 +571,34 @@ int llread(unsigned char *packet) {
 
                         if(bcc2 == bcc_calculo) { // TUDO CORRECTO YAYYYYYYY
                             stateR = STOP_STATE;
-
+                            
                             //responder :)
-                            if (Nr == 0){ // responder com RR0
+                            if (Nr_r == 0){ // responder com RR0
                                 unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_RR0, ADDRESS_RECEIVE ^ CONTROL_RR0, FLAG};
                                 writeBytesSerialPort(frame, 5);
-                                Nr = 1;
+                                Nr_r = 1;
+                                Ns_t = 0;
+                                printf("RR0\n");
                             } else { // responder com RR1
                                 unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_RR1, ADDRESS_RECEIVE ^ CONTROL_RR1, FLAG};
                                 writeBytesSerialPort(frame, 5);
-                                Nr = 0;
+                                Nr_r = 0;
+                                Ns_t = 1;
+                                printf("RR1\n");
                             }
+                            printf("VOU BAZAR DO LLREAD\n");
                             return i;
+                            printf("NÃO BAZEI?\n");
                         } else {
                             //responder erro :(
-                            if (Nr == 0){ // rejeitar com REJ0
+                            if (Nr_r == 0){ // rejeitar com REJ0
                                 unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_REJ0, ADDRESS_RECEIVE ^ CONTROL_REJ0, FLAG};
                                 writeBytesSerialPort(frame, 5);
+                                printf("REJ0\n");
                             } else { // rejeitar com REJ1
                                 unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_REJ1, ADDRESS_RECEIVE ^ CONTROL_REJ1, FLAG};
                                 writeBytesSerialPort(frame, 5);
+                                printf("REJ1\n");
                             }
                         }
 

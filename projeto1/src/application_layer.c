@@ -117,7 +117,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
             fseek(file,prev,SEEK_SET); // Go back to previous position
 
 
-
+            printf("vou enviar o control packet\n");
             unsigned int startingCPSize; // Control packet size
             unsigned char *startingControlPacket = createControlPacket(filename, fileSize, &startingCPSize, 1); // Get start control packet
 
@@ -126,7 +126,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
                 printf("error: llwrite start failed");
                 return;
             }  
-
+            printf("enviei o control packet\n");
             
 
             unsigned char sequenceNum = 0;
@@ -160,10 +160,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
                 content += payloadSize;
             }
 
-            
             unsigned int endingCPSize; // Control packet size
             unsigned char *endingControlPacket = createControlPacket(filename, fileSize, &endingCPSize, 3); // Get start control packet
-
+            printf("vou mandar o ending control packet\n");
             // Send data in buf with size bufSize.
             if (llwrite(endingControlPacket, endingCPSize) == -1) {
                 printf("error: llwrite ending failed");
@@ -181,7 +180,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
             while (sizePacket == -1) {
                 sizePacket = llread(packet);
             }
-
+            printf("sai do while inicial\n");
             char receivedFilename = 0;
             analyseControlPacket(packet, sizePacket, &receivedFilename);
 
@@ -194,7 +193,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
                 }
                 if(sizePacket2 == 0) {break;}
                 else if (packet[0] != 3) {  // If it is not an end control packet
-                    
+                    printf("Não era um ending control packet\n");
                     unsigned char *bufReceived = (unsigned char* ) malloc (sizePacket2);
 
                     memcpy(bufReceived,packet+4,sizePacket2-4);
@@ -204,6 +203,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
                 }
                 else continue;
             }
+
 
             fclose(fileReceived);
             
