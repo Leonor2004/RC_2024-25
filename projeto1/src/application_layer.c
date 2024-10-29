@@ -90,7 +90,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
             connectionParameters.role=LlRx;
             break;
         default:
-            printf("error: unknown user.role");
+            printf("ERROR: unknown user.role");
             return;
     }
 
@@ -100,7 +100,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
     connectionParameters.timeout=timeout;
 
     if (llopen(connectionParameters) == -1) {
-        printf("error: llopen failed");
+        printf("ERROR: llopen failed");
         return;
     }
 
@@ -109,7 +109,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
         
             FILE* file = fopen(filename, "rb"); // Open a binary file for reading. (The file must exist.)
             if (file == NULL) {
-                perror("file not found\n");
+                perror("ERROR: file not found\n");
                 return;
             }
             int prev = ftell(file); // Store current position
@@ -123,7 +123,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
 
             // Send data in buf with size bufSize.
             if (llwrite(startingControlPacket, startingCPSize) == -1) {
-                printf("error: llwrite starting control packet failed");
+                printf("ERROR: llwrite starting control packet failed");
                 return;
             }  
             
@@ -149,7 +149,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
                 unsigned char *dataPacket = createDataPacket(payload, payloadSize, &dataPacketSize, sequenceNum);
 
                 if (llwrite(dataPacket, dataPacketSize) == -1) {
-                    printf("error: llwrite data packet failed");
+                    printf("ERROR: llwrite data packet failed");
                     return;
                 }
 
@@ -163,7 +163,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
             unsigned char *endingControlPacket = createControlPacket(filename, fileSize, &endingCPSize, 3); // Get start control packet
             // Send data in buf with size bufSize.
             if (llwrite(endingControlPacket, endingCPSize) == -1) {
-                printf("error: llwrite ending failed");
+                printf("ERROR: llwrite ending failed");
                 return;
             }  
             break;
@@ -212,12 +212,12 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
 
 
         default:
-            printf("error: role unknown");
+            printf("ERROR: role unknown");
             return;
     }
 
     if(llclose(TRUE) == -1) {
-        printf("error: llclose failed");
+        printf("ERROR: llclose failed");
         return;
     }
 
