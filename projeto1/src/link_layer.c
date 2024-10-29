@@ -61,13 +61,16 @@ void alarmHandler(int signal) {
 int llopen(LinkLayer connectionParameters) {
     int fd = openSerialPort(connectionParameters.serialPort, connectionParameters.baudRate);
     if (fd < 0) { return -1;}
-    connectionParametersCopy = connectionParameters;
+    connectionParametersCopy.role = connectionParameters.role;
+    connectionParametersCopy.baudRate = connectionParameters.baudRate;
+    connectionParametersCopy.nRetransmissions = connectionParameters.nRetransmissions;
+    //connectionParametersCopy.serialPort = connectionParameters.serialPort;
+    connectionParametersCopy.timeout = connectionParameters.timeout;
 
     switch (connectionParameters.role) {
 
         case LlTx: //WRITE
             //WRITE ESCREVE
-            printf("write vai escrever\n");
             unsigned char bufW[BUF_SIZE];
   
             unsigned char BCC1W = ADDRESS_SEND ^ CONTROL_SET;
@@ -76,14 +79,10 @@ int llopen(LinkLayer connectionParameters) {
             bufW[2] = CONTROL_SET; //0X03
             bufW[3] = BCC1W;
             bufW[4] = FLAG;
-            printf("write preparou o buffer\n");
-            printf("flag: 0x%02X\n", bufW[0]);
-            printf("address: 0x%02X\n", bufW[1]);
-            printf("control: 0x%02X\n", bufW[2]);
-            printf("bcc: 0x%02X\n", bufW[3]);
-            printf("flag: 0x%02X\n", bufW[4]);
+            printf("write preparou SET (llopen)\n");
+            printf("Flag: 0x%02X | Address: 0x%02X | Control: 0x%02X | BCC: 0x%02X | Flag: 0x%02X\n", bufW[0], bufW[1], bufW[2], bufW[3], bufW[4]);
             int bytesW = writeBytesSerialPort(bufW, BUF_SIZE);
-            printf("%d bytes written\n", bytesW);
+            printf("%d bytes written (SET) (llopen)\n", bytesW);
 
             //WRITE RECEBE DE VOLTA
         
@@ -102,7 +101,6 @@ int llopen(LinkLayer connectionParameters) {
 
                 if (alarmEnabled == FALSE) {
                     if(alarmCount != 0){
-                        printf("write vai escrever de novo\n");
                         unsigned char bufW[BUF_SIZE];
 
                         unsigned char BCC1W = ADDRESS_SEND ^ CONTROL_SET;
@@ -111,17 +109,13 @@ int llopen(LinkLayer connectionParameters) {
                         bufW[2] = CONTROL_SET; //0X03
                         bufW[3] = BCC1W;
                         bufW[4] = FLAG;
-                        printf("write preparou o buffer\n");
-                        printf("flag: 0x%02X\n", bufW[0]);
-                        printf("address: 0x%02X\n", bufW[1]);
-                        printf("control: 0x%02X\n", bufW[2]);
-                        printf("bcc: 0x%02X\n", bufW[3]);
-                        printf("flag: 0x%02X\n", bufW[4]);
+                        printf("write preparou SET de novo (llopen)\n");
+                        printf("Flag: 0x%02X | Address: 0x%02X | Control: 0x%02X | BCC: 0x%02X | Flag: 0x%02X\n", bufW[0], bufW[1], bufW[2], bufW[3], bufW[4]);
                         int bytesW = writeBytesSerialPort(bufW, BUF_SIZE);
-                        printf("%d bytes written\n", bytesW);
+                        printf("%d bytes written (SET) de novo (llopen)\n", bytesW);
                     }
                     
-                    printf("alarme do write\n");
+                    //printf("alarme do write\n");
                     alarm(connectionParameters.timeout); // Set alarm to be triggered in Xs
                     alarmEnabled = TRUE;
                     
@@ -185,10 +179,12 @@ int llopen(LinkLayer connectionParameters) {
                     }
                 }
             }
-
+            
+            printf("recebi do reader (llopen) : ");
             for (int i = 0; i < 5; i++){
-                printf("var = 0x%02X\n", bufW2[i]);
+                printf("0x%02X |", bufW2[i]);
             } 
+            printf("\n");
             
             if (stateW != STOP_STATE) { return -1;}
 
@@ -263,13 +259,14 @@ int llopen(LinkLayer connectionParameters) {
                 
             }
 
+            printf("recebi do writer (llopen) : ");
             for (int i = 0; i < 5; i++){
-                printf("var = 0x%02X\n", bufR[i]);
-            }
+                printf("0x%02X |", bufR[i]);
+            } 
+            printf("\n");
 
             //READ RESPONDE DE VOLTA
             // Create string to send
-            printf("read manda de volta\n");
             unsigned char bufR2[BUF_SIZE];
             unsigned char BCC1R = ADDRESS_RECEIVE ^ CONTROL_UA;
             bufR2[0] = FLAG;
@@ -277,14 +274,10 @@ int llopen(LinkLayer connectionParameters) {
             bufR2[2] = CONTROL_UA; //0X07
             bufR2[3] = BCC1R;
             bufR2[4] = FLAG;
-            printf("read preparou o buffer: \n");
-            printf("flag: 0x%02X\n", bufR2[0]);
-            printf("address: 0x%02X\n", bufR2[1]);
-            printf("control: 0x%02X\n", bufR2[2]);
-            printf("bcc: 0x%02X\n", bufR2[3]);
-            printf("flag: 0x%02X\n", bufR2[4]);
+            printf("read preparou o UA (llopen) \n");
+            printf("Flag: 0x%02X | Address: 0x%02X | Control: 0x%02X | BCC: 0x%02X | Flag: 0x%02X\n", bufW[0], bufW[1], bufW[2], bufW[3], bufW[4]);
             int bytesR = writeBytesSerialPort(bufR2, BUF_SIZE);
-            printf("%d bytes written\n", bytesR);    
+            printf("%d bytes written (UA) (llopen)\n", bytesR);    
             
             break;
             
@@ -300,8 +293,6 @@ int llopen(LinkLayer connectionParameters) {
 // LLWRITE
 ////////////////////////////////////////////////
 int llwrite(const unsigned char *buf, int bufSize) {
-    printf("Ns = 0x%02X\n", Ns_t);
-    printf("Nr = 0x%02X\n", Nr_r);
 
     unsigned int sizeOfFrame = bufSize + 6; // 6 = 2*FLAG + ADDRESS + CONTROL + BCC1 + BCC2
     unsigned char *frame = (unsigned char *) malloc(sizeOfFrame);
@@ -348,14 +339,10 @@ int llwrite(const unsigned char *buf, int bufSize) {
     frame[k] = FLAG; //flag
     k++;
 
-    printf("write vai escrever no llwrite\n");
+    printf("write vai escrever (llwrite)\n");
     int bytesW = writeBytesSerialPort(frame, k);
     printf("%d bytes written\n", bytesW);
-    for (int i = 0; i < k; i++){
-        printf("var = 0x%02X\n", frame[i]);
-    }
 
-    sleep(5);
     // Loop for input
     unsigned char bufllwrite[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
 
@@ -367,12 +354,12 @@ int llwrite(const unsigned char *buf, int bufSize) {
 
         if (alarmEnabled == FALSE) {
             if(alarmCount != 0){
-                printf("write vai escrever de novo\n");
+                printf("write vai escrever de novo (llwrite)\n");
                 int bytesW = writeBytesSerialPort(frame, k);
                 printf("%d bytes written\n", bytesW);
             }
             
-            printf("alarme do write\n");
+            ///printf("alarme do write\n");
             alarm(connectionParametersCopy.timeout); // Set alarm to be triggered in Xs
             alarmEnabled = TRUE;
         }
@@ -380,7 +367,6 @@ int llwrite(const unsigned char *buf, int bufSize) {
         unsigned char byte;
 
         if(readByteSerialPort(&byte) > 0){
-            printf("write e recebi: 0x%02X\n", byte);
             switch (statellwrite) {
                 case START_STATE:
                     if(byte == FLAG) {
@@ -451,18 +437,15 @@ int llwrite(const unsigned char *buf, int bufSize) {
         }
     }
 
+    printf("recebi do reader (llwrite) : ");
     for (int i = 0; i < 5; i++){
-        printf("var = 0x%02X\n", bufllwrite[i]);
-    }
+        printf("0x%02X |", bufllwrite[i]);
+    } 
+    printf("\n");
 
     free(frame);
     
     if(statellwrite == STOP_STATE) {return sizeOfFrame;} // correto
-
-    /*if(llclose(TRUE) == -1) {
-        printf("error: llclose failed");
-        return -1;
-    }*/
 
     return -1;
 }
@@ -471,11 +454,8 @@ int llwrite(const unsigned char *buf, int bufSize) {
 // LLREAD
 ////////////////////////////////////////////////
 int llread(unsigned char *packet) {
-    printf("Ns = 0x%02X\n", Ns_t);
-    printf("Nr = 0x%02X\n", Nr_r);
     // READ RECEBE
     // Loop for input
-    printf("read entrei no llread\n");
     state_t stateR = START_STATE;
     int a_prov2 = 0;
     int c_prov2 = 0;
@@ -485,7 +465,6 @@ int llread(unsigned char *packet) {
         unsigned char byte;
 
         if(readByteSerialPort(&byte) > 0){
-            printf("recebi: 0x%02X\n", byte);
             switch (stateR) {
                 case START_STATE:
                     if(byte == FLAG) {
@@ -493,7 +472,6 @@ int llread(unsigned char *packet) {
                     }
                     break;
                 case FLAG_STATE:
-                    printf("entrei no flag state\n");
                     if(byte == FLAG) {
                     } else if (byte == ADDRESS_SEND) {
                         a_prov2 = byte;
@@ -505,9 +483,6 @@ int llread(unsigned char *packet) {
                     }
                     break;
                 case A_STATE:
-                    printf("entrei no A state\n");
-                    printf("Ns: 0x%02X\n", Ns_t);
-                    printf("byte: 0x%02X\n", byte);
                     if(byte == FLAG) {
                         stateR = FLAG_STATE;
                     } else if ((Ns_t == 0 && byte == CONTROL_I_N0) || (Ns_t == 1 && byte == CONTROL_I_N1)){
@@ -532,35 +507,20 @@ int llread(unsigned char *packet) {
                     break;
                     break;
                 case C_STATE:
-                    printf("entrei no C state\n");
-                    printf("devia ser: 0x%02X\n", (a_prov2 ^ c_prov2));
                     if(byte == FLAG) {
                         stateR = FLAG_STATE;
                     } else if (byte == (a_prov2 ^ c_prov2)) {
                         stateR = BCC_STATE;
-                    } else if (byte == 0x00) {
+                    } else if (byte == 0x00) { 
                         // Ignore and stay
                     } else {
                         stateR = START_STATE;
                     }
                     break;
                 case BCC_STATE: // DESTUFF AND BCC CHECKING
-                    unsigned char byte2;
                     if (byte == ESCAPE) {
-                        int teste = -1;
-                        while (teste < 0){
-                            readByteSerialPort(&byte2);
-                        }
-                        if(byte2 == XOR_ESCAPE){
-                            packet[i++] = ESCAPE;
-                        } else if (byte2 == XOR_FLAG) {
-                            packet[i++] = FLAG;
-                        } else {
-                            printf("ERROR: ESCAPE found not stuffed!\n");
-                            return -1;
-                        }
+                        stateR = DESTUFFING_STATE;
                     } else if (byte == FLAG) {
-                        printf("cheguei a flag, o anterior é o bcc\n");
                         unsigned int bcc2 = packet[--i];
                         packet[i] = '\0';
 
@@ -586,9 +546,12 @@ int llread(unsigned char *packet) {
                                 Ns_t = 1;
                                 printf("RR1\n");
                             }
-                            printf("VOU BAZAR DO LLREAD\n");
+                            /*printf("recebi do write (llread) : ");
+                            for (int j = 0; j < i; i++){
+                                printf("0x%02X |", frame[j]);
+                            } 
+                            printf("\n");*/
                             return i;
-                            printf("NÃO BAZEI?\n");
                         } else {
                             //responder erro :(
                             if (Nr_r == 0){ // rejeitar com REJ0
@@ -598,7 +561,7 @@ int llread(unsigned char *packet) {
                             } else { // rejeitar com REJ1
                                 unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_REJ1, ADDRESS_RECEIVE ^ CONTROL_REJ1, FLAG};
                                 writeBytesSerialPort(frame, 5);
-                                printf("REJ1\n");
+                                printf("REJ1\n");   
                             }
                         }
 
@@ -606,6 +569,19 @@ int llread(unsigned char *packet) {
                         packet[i++] = byte;
                     }
 
+                    break;
+                case DESTUFFING_STATE:
+                    if(byte == XOR_ESCAPE){
+                        packet[i++] = ESCAPE;
+                        stateR = BCC_STATE;
+                    } else if (byte == XOR_FLAG) {
+                        packet[i++] = FLAG;
+                        stateR = BCC_STATE;
+                    } else {
+                        stateR = STOP_STATE;
+                        return -1;
+                    }
+                    
                     break;
                 default:
                     break;
@@ -629,23 +605,19 @@ int llclose(int showStatistics) {
     {
     case LlTx: // transmiter
         //WRITE ESCREVE
-        printf("write vai escrever\n");
+        sleep(1);
         unsigned char bufW[BUF_SIZE];
 
-        unsigned char BCC1W = ADDRESS_SEND ^ CONTROL_SET;
+        unsigned char BCC1W = ADDRESS_SEND ^ CONTROL_DISC;
         bufW[0] = FLAG;
         bufW[1] = ADDRESS_SEND; //0X03
         bufW[2] = CONTROL_DISC; //0x0B
         bufW[3] = BCC1W;
         bufW[4] = FLAG;
-        printf("write preparou o buffer\n");
-        printf("flag: 0x%02X\n", bufW[0]);
-        printf("address: 0x%02X\n", bufW[1]);
-        printf("control: 0x%02X\n", bufW[2]);
-        printf("bcc: 0x%02X\n", bufW[3]);
-        printf("flag: 0x%02X\n", bufW[4]);
+        printf("write preparou o DISC (llclose)\n");
+        printf("Flag: 0x%02X | Address: 0x%02X | Control: 0x%02X | BCC: 0x%02X | Flag: 0x%02X\n", bufW[0], bufW[1], bufW[2], bufW[3], bufW[4]);
         int bytesW = writeBytesSerialPort(bufW, BUF_SIZE);
-        printf("%d bytes written\n", bytesW);
+        printf("%d bytes written (DISC)\n", bytesW);
 
         //WRITE RECEBE DE VOLTA
     
@@ -664,26 +636,21 @@ int llclose(int showStatistics) {
 
             if (alarmEnabled == FALSE) {
                 if(alarmCount != 0){
-                    printf("write vai escrever de novo\n");
                     unsigned char bufW[BUF_SIZE];
 
-                    unsigned char BCC1W = ADDRESS_SEND ^ CONTROL_SET;
+                    unsigned char BCC1W = ADDRESS_SEND ^ CONTROL_DISC;
                     bufW[0] = FLAG;
                     bufW[1] = ADDRESS_SEND; //0X03
                     bufW[2] = CONTROL_DISC; //0x0B
                     bufW[3] = BCC1W;
                     bufW[4] = FLAG;
-                    printf("write preparou o buffer\n");
-                    printf("flag: 0x%02X\n", bufW[0]);
-                    printf("address: 0x%02X\n", bufW[1]);
-                    printf("control: 0x%02X\n", bufW[2]);
-                    printf("bcc: 0x%02X\n", bufW[3]);
-                    printf("flag: 0x%02X\n", bufW[4]);
+                    printf("write preparou o DISC outra vez (llclose)\n");
+                    printf("Flag: 0x%02X | Address: 0x%02X | Control: 0x%02X | BCC: 0x%02X | Flag: 0x%02X\n", bufW[0], bufW[1], bufW[2], bufW[3], bufW[4]);
                     int bytesW = writeBytesSerialPort(bufW, BUF_SIZE);
-                    printf("%d bytes written\n", bytesW);
+                    printf("%d bytes written (DISC)\n", bytesW);
                 }
                 
-                printf("alarme do write\n");
+                // printf("alarme do write\n");
                 alarm(connectionParametersCopy.timeout); // Set alarm to be triggered in Xs
                 alarmEnabled = TRUE;
                 
@@ -739,23 +706,19 @@ int llclose(int showStatistics) {
                             stateW = STOP_STATE;
                             alarm(0);
                             
-                            printf("write vai escrever o UA\n");
+                            //printf("write vai escrever\n");
                             unsigned char bufAU[BUF_SIZE];
 
-                            unsigned char BCC1AU = ADDRESS_SEND ^ CONTROL_SET;
+                            unsigned char BCC1AU = ADDRESS_SEND ^ CONTROL_UA;
                             bufAU[0] = FLAG;
                             bufAU[1] = ADDRESS_SEND; //0X03
                             bufAU[2] = CONTROL_UA; //0X07
                             bufAU[3] = BCC1AU;
                             bufAU[4] = FLAG;
-                            printf("write preparou o buffer\n");
-                            printf("flag: 0x%02X\n", bufAU[0]);
-                            printf("address: 0x%02X\n", bufAU[1]);
-                            printf("control: 0x%02X\n", bufAU[2]);
-                            printf("bcc: 0x%02X\n", bufAU[3]);
-                            printf("flag: 0x%02X\n", bufAU[4]);
+                            printf("write preparou o UA (llclose)\n");
+                            printf("Flag: 0x%02X | Address: 0x%02X | Control: 0x%02X | BCC: 0x%02X | Flag: 0x%02X\n", bufW[0], bufW[1], bufW[2], bufW[3], bufW[4]);
                             int bytesAU = writeBytesSerialPort(bufAU, BUF_SIZE);
-                            printf("%d bytes written\n", bytesAU);
+                            printf("%d bytes written (UA final)\n", bytesAU);
 
 
                         } else {
@@ -768,9 +731,12 @@ int llclose(int showStatistics) {
             }
         }
 
+        printf("recebi do reader (llclose) : ");
         for (int i = 0; i < 5; i++){
-            printf("var = 0x%02X\n", bufW2[i]);
+            printf("0x%02X |", bufW2[i]);
         } 
+        printf("\n");
+        
         
         if (stateW != STOP_STATE) { return -1;}
 
@@ -779,6 +745,7 @@ int llclose(int showStatistics) {
 
         // READ RECEBE
         // Loop for input
+        printf("reader entrou no llclose\n");
         unsigned char bufR[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
 
         state_t stateR = START_STATE;
@@ -788,7 +755,7 @@ int llclose(int showStatistics) {
         while(stateR != STOP_STATE) {
             unsigned char byte;
 
-            if(readByteSerialPort(&byte)){
+            if(readByteSerialPort(&byte) > 0){
                 switch (stateR) {
                     case START_STATE:
                         if(byte == FLAG) {
@@ -845,28 +812,26 @@ int llclose(int showStatistics) {
             
         }
 
+        printf("recebi do writer (llclose) : ");
         for (int i = 0; i < 5; i++){
-            printf("var = 0x%02X\n", bufR[i]);
-        }
+            printf("0x%02X |", bufR[i]);
+        } 
+        printf("\n");
 
         //READ RESPONDE DE VOLTA
         // Create string to send
         printf("read manda de volta\n");
         unsigned char bufR2[BUF_SIZE];
-        unsigned char BCC1R = ADDRESS_RECEIVE ^ CONTROL_UA;
+        unsigned char BCC1R = ADDRESS_RECEIVE ^ CONTROL_DISC;
         bufR2[0] = FLAG;
         bufR2[1] = ADDRESS_RECEIVE; //0X01
         bufR2[2] = CONTROL_DISC; //0X0B
         bufR2[3] = BCC1R;
         bufR2[4] = FLAG;
-        printf("read preparou o buffer: \n");
-        printf("flag: 0x%02X\n", bufR2[0]);
-        printf("address: 0x%02X\n", bufR2[1]);
-        printf("control: 0x%02X\n", bufR2[2]);
-        printf("bcc: 0x%02X\n", bufR2[3]);
-        printf("flag: 0x%02X\n", bufR2[4]);
+        printf("read preparou o DISC: \n");
+        printf("Flag: 0x%02X | Address: 0x%02X | Control: 0x%02X | BCC: 0x%02X | Flag: 0x%02X\n", bufW[0], bufW[1], bufW[2], bufW[3], bufW[4]);
         int bytesR = writeBytesSerialPort(bufR2, BUF_SIZE);
-        printf("%d bytes written\n", bytesR);    
+        printf("%d bytes written (DISC)\n", bytesR);    
         
         stateR = START_STATE;
         a_prov2 = 0;
@@ -932,9 +897,11 @@ int llclose(int showStatistics) {
             
         }
 
+        printf("recebi do reader (llclose) : ");
         for (int i = 0; i < 5; i++){
-            printf("var = 0x%02X\n", bufR[i]);
-        }
+            printf("0x%02X |", bufR[i]);
+        } 
+        printf("\n");
 
 
         break;

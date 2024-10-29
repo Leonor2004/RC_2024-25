@@ -11,7 +11,8 @@ typedef enum {
     C_STATE,
     BCC_STATE,
     STOP_STATE,
-    PRE_STOP_STATE
+    PRE_STOP_STATE,
+    DESTUFFING_STATE
 } state_t;
 
 typedef enum

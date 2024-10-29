@@ -60,7 +60,7 @@ unsigned char * createDataPacket(unsigned char* payload, int payloadSize, unsign
     return packet;
 }
 
-void analyseControlPacket(unsigned char* packet, int sizePacket, char* receivedFilename) {
+unsigned char* analyseControlPacket(unsigned char* packet, int sizePacket) {
     
     unsigned char receivedFilesize;
     unsigned char L1 = packet [2]; // size of fileSize content
@@ -72,8 +72,9 @@ void analyseControlPacket(unsigned char* packet, int sizePacket, char* receivedF
     }
 
     unsigned char L2 = packet[3+L1+1]; // size of filename content
-    receivedFilename = (char*) malloc (L2);
+    unsigned char* receivedFilename = (unsigned char*) malloc (L2);
     memcpy(receivedFilename, packet+3+L1+1+1, L2);
+    return receivedFilename;
 }
 
 
@@ -113,28 +114,26 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
             }
             int prev = ftell(file); // Store current position
             fseek(file,0L,SEEK_END); // Go to end of file
-            long int fileSize = ftell(file)-prev; // Get file size
+            long int fileSize = ftell(file) - prev; // Get file size
             fseek(file,prev,SEEK_SET); // Go back to previous position
 
 
-            printf("vou enviar o control packet\n");
             unsigned int startingCPSize; // Control packet size
             unsigned char *startingControlPacket = createControlPacket(filename, fileSize, &startingCPSize, 1); // Get start control packet
 
             // Send data in buf with size bufSize.
             if (llwrite(startingControlPacket, startingCPSize) == -1) {
-                printf("error: llwrite start failed");
+                printf("error: llwrite starting control packet failed");
                 return;
             }  
-            printf("enviei o control packet\n");
             
 
             unsigned char sequenceNum = 0;
             long int bytesRemaining = fileSize;
             unsigned char* content = (unsigned char* ) malloc (sizeof(unsigned char) * fileSize); // Allocate memory for file content
             fread(content, 1, fileSize, file); // Read file content into buffer
-
-            while (bytesRemaining < 0) {
+            
+            while (bytesRemaining > 0) {
                 
                 int payloadSize=0;
                 if (bytesRemaining > (long int) MAX_PAYLOAD_SIZE){
@@ -162,15 +161,12 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
 
             unsigned int endingCPSize; // Control packet size
             unsigned char *endingControlPacket = createControlPacket(filename, fileSize, &endingCPSize, 3); // Get start control packet
-            printf("vou mandar o ending control packet\n");
             // Send data in buf with size bufSize.
             if (llwrite(endingControlPacket, endingCPSize) == -1) {
                 printf("error: llwrite ending failed");
                 return;
             }  
-
             break;
-
 
         case LlRx:
 
@@ -180,30 +176,35 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
             while (sizePacket == -1) {
                 sizePacket = llread(packet);
             }
-            printf("sai do while inicial\n");
-            char receivedFilename = 0;
-            analyseControlPacket(packet, sizePacket, &receivedFilename);
+            
+            unsigned char* receivedFilename = analyseControlPacket(packet, sizePacket);
 
-            FILE* fileReceived = fopen((char*) &receivedFilename, "wb+"); // Open an empty binary file for both reading and writing. (If file exists its contents are destroyed)
+            FILE* fileReceived = fopen((char*) filename, "wb+"); // Open an empty binary file for both reading and writing. (If file exists its contents are destroyed)
+            if (fileReceived==NULL) printf("ERROR: fileReceived failed to open\n");
+
             
             while(TRUE) {
                 int sizePacket2 = -1;
                 while (sizePacket2 == -1) {
                     sizePacket2 = llread(packet);
                 }
+                
+                int L1 = packet[3];
+                int L2 = packet[2];
+                int K = (256*L2) + L1;
+
                 if(sizePacket2 == 0) {break;}
+                else if (packet[0] == 3) {
+                    break;
+                }
                 else if (packet[0] != 3) {  // If it is not an end control packet
-                    printf("Não era um ending control packet\n");
-                    unsigned char *bufReceived = (unsigned char* ) malloc (sizePacket2);
-
-                    memcpy(bufReceived,packet+4,sizePacket2-4);
-
-                    fwrite(bufReceived, sizeof(unsigned char), sizePacket2-4, fileReceived);
+                    unsigned char *bufReceived = (unsigned char* ) malloc (K);
+                    memcpy(bufReceived,packet+4,K);
+                    // bufReceived += sizePacket2+4;
+                    fwrite(bufReceived, sizeof(unsigned char), K, fileReceived);
                     free(bufReceived);
                 }
-                else continue;
             }
-
 
             fclose(fileReceived);
             
