@@ -32,6 +32,8 @@
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 
+unsigned char lastFrame[5];
+
 typedef enum {
     START_STATE,
     FLAG_STATE,
@@ -606,6 +608,7 @@ int llread(unsigned char *packet) {
                                 Nr_r = 1;
                                 Ns_t = 0;
                                 stateR = STOP_STATE;
+                                memcpy(lastFrame, frame, sizeof(frame));
                             } else { // responder com RR1
                                 unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_RR1, ADDRESS_RECEIVE ^ CONTROL_RR1, FLAG};
                                 writeBytesSerialPort(frame, 5);
@@ -618,6 +621,8 @@ int llread(unsigned char *packet) {
                                 Nr_r = 0;
                                 Ns_t = 1;
                                 stateR = STOP_STATE;
+                                memcpy(lastFrame, frame, sizeof(frame));
+                                
                             }
                             /*printf("recebi do write (llread) : ");
                             for (int j = 0; j < i; i++){
@@ -693,7 +698,7 @@ int llclose(int showStatistics) {
     switch (connectionParametersCopy.role)
     {
     case LlTx: // transmiter
-        //WRITE ESCREVE
+        {//WRITE ESCREVE
         sleep(1);
         unsigned char bufW[BUF_SIZE];
 
@@ -845,12 +850,18 @@ int llclose(int showStatistics) {
         alarmCount = 0;
         if (stateW != STOP_STATE) { return -1;}
 
-        break;
+        break;}
     case LlRx: //receiver
 {
         // READ RECEBE
         // Loop for input
         unsigned char bufR[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
+
+        printf("------------------------------------------------------------------------\n");
+        printf("Last frame is:  (llclose)\n");
+        printf("Flag: 0x%02X | Address: 0x%02X | Control: 0x%02X | BCC: 0x%02X | Flag: 0x%02X\n", lastFrame[0], lastFrame[1], lastFrame[2], lastFrame[3], lastFrame[4]);
+        printf("%d bytes written (RR1)(llread)\n", 5);
+        printf("------------------------------------------------------------------------\n");
 
         state_t stateR = START_STATE;
         int a_prov2 = 0;
@@ -886,6 +897,8 @@ int llclose(int showStatistics) {
                             bufR[2] = byte;
                             c_prov2 = byte;
                             stateR = C_STATE;
+                        } else if (byte == CONTROL_I_N0 || byte == CONTROL_I_N1) {
+                            writeBytesSerialPort(lastFrame,5);
                         } else {
                             stateR = START_STATE;
                         }
@@ -936,7 +949,7 @@ int llclose(int showStatistics) {
         bufR2[4] = FLAG;
         printf("------------------------------------------------------------------------\n");
         printf("Read DISC (llclose): \n");
-        printf("Flag: 0x%02X | Address: 0x%02X | Control: 0x%02X | BCC: 0x%02X | Flag: 0x%02X\n", bufW[0], bufW[1], bufW[2], bufW[3], bufW[4]);
+        printf("Flag: 0x%02X | Address: 0x%02X | Control: 0x%02X | BCC: 0x%02X | Flag: 0x%02X\n", bufR2[0], bufR2[1], bufR2[2], bufR2[3], bufR2[4]);
         int bytesR = writeBytesSerialPort(bufR2, BUF_SIZE);
         printf("%d bytes written (DISC)(llclose)\n", bytesR);
         printf("------------------------------------------------------------------------\n");
