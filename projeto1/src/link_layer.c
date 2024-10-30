@@ -580,6 +580,7 @@ int llread(unsigned char *packet) {
                                 frameCounter++;
                                 Nr_r = 1;
                                 Ns_t = 0;
+                                stateR = STOP_STATE;
                             } else { // responder com RR1
                                 unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_RR1, ADDRESS_RECEIVE ^ CONTROL_RR1, FLAG};
                                 writeBytesSerialPort(frame, 5);
@@ -591,6 +592,7 @@ int llread(unsigned char *packet) {
                                 frameCounter++;
                                 Nr_r = 0;
                                 Ns_t = 1;
+                                stateR = STOP_STATE;
                             }
                             /*printf("recebi do write (llread) : ");
                             for (int j = 0; j < i; i++){
@@ -609,6 +611,7 @@ int llread(unsigned char *packet) {
                                 printf("%d bytes written (REJ0)(llread)\n", 5);
                                 printf("------------------------------------------------------------------------\n");
                                 frameCounter++;
+                                stateR = START_STATE;
                             } else { // rejeitar com REJ1
                                 unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_REJ1, ADDRESS_RECEIVE ^ CONTROL_REJ1, FLAG};
                                 writeBytesSerialPort(frame, 5);
@@ -618,6 +621,7 @@ int llread(unsigned char *packet) {
                                 printf("%d bytes written (REJ1)(llread)\n", 5);
                                 printf("------------------------------------------------------------------------\n");
                                 frameCounter++; 
+                                stateR = START_STATE;
                             }
                         }
 
