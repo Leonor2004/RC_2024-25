@@ -90,14 +90,14 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
 
     switch (role[0]) {
         case 't':
-            connectionParameters.role=LlTx;
-            break;
+            {connectionParameters.role=LlTx;
+            break;}
         case 'r':
-            connectionParameters.role=LlRx;
-            break;
+            {connectionParameters.role=LlRx;
+            break;}
         default:
-            printf("ERROR: unknown user.role");
-            return;
+            {printf("ERROR: unknown user.role");
+            return;}
     }
 
     strcpy(connectionParameters.serialPort, serialPort);
@@ -112,7 +112,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
 
     switch (connectionParameters.role) {
         case LlTx:
-        
+        {
             FILE* file = fopen(filename, "rb"); // Open a binary file for reading. (The file must exist.)
             if (file == NULL) {
                 perror("ERROR: file not found\n");
@@ -172,10 +172,10 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
                 printf("ERROR: llwrite ending failed");
                 return;
             }  
-            break;
+            break;}
 
         case LlRx:
-
+{
             unsigned char* packet = (unsigned char* ) malloc(MAX_PAYLOAD_SIZE); // Allocate memory for packet
             
             int sizePacket = -1;
@@ -214,12 +214,12 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
 
             fclose(fileReceived);
             
-            break;
+            break;}
 
 
         default:
-            printf("ERROR: role unknown");
-            return;
+            {printf("ERROR: role unknown");
+            return;}
     }
 
     if(llclose(TRUE) == -1) {

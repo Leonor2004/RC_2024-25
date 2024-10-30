@@ -81,7 +81,11 @@ int llopen(LinkLayer connectionParameters) {
 
     switch (connectionParameters.role) {
 
-        case LlTx: //WRITE
+        case LlTx:
+        {
+        
+         //WRITE
+
             //WRITE ESCREVE
             unsigned char bufW[BUF_SIZE];
   
@@ -143,14 +147,14 @@ int llopen(LinkLayer connectionParameters) {
 
                 if(readByteSerialPort(&byte) > 0){
                     switch (stateW) {
-                        case START_STATE:
+                        case START_STATE: {
                             if(byte == FLAG) {
                                 bufW2[0] = byte;
                                 stateW = FLAG_STATE;
                             }
-                            break;
+                            break;}
                         case FLAG_STATE:
-                            if(byte == FLAG) {
+                            {if(byte == FLAG) {
                                 bufW2[0] = byte;
                             } else if (byte == ADDRESS_RECEIVE) {
                                 bufW2[1] = byte;
@@ -159,9 +163,9 @@ int llopen(LinkLayer connectionParameters) {
                             } else {
                                 stateW = START_STATE;
                             }
-                            break;
+                            break;}
                         case A_STATE:
-                            if(byte == FLAG) {
+                            {if(byte == FLAG) {
                                 bufW2[0] = byte;
                                 stateW = FLAG_STATE;
                             } else if (byte == CONTROL_UA) {
@@ -171,9 +175,9 @@ int llopen(LinkLayer connectionParameters) {
                             } else {
                                 stateW = START_STATE;
                             }
-                            break;
+                            break;}
                         case C_STATE:
-                            if(byte == FLAG) {
+                            {if(byte == FLAG) {
                                 bufW2[0] = byte;
                                 stateW = FLAG_STATE;
                             } else if (byte == (a_prov1 ^ c_prov1)) {
@@ -182,9 +186,9 @@ int llopen(LinkLayer connectionParameters) {
                             } else {
                                 stateW = START_STATE;
                             }
-                            break;
+                            break;}
                         case BCC_STATE:
-                            if(byte == FLAG) {
+                            {if(byte == FLAG) {
                                 bufW2[4] = byte;
                                 stateW = STOP_STATE;
                                 frameCounterReceived++;
@@ -192,9 +196,9 @@ int llopen(LinkLayer connectionParameters) {
                             } else {
                                 stateW = START_STATE;
                             }
-                            break;
+                            break;}
                         default:
-                            break;
+                            {break;}
                     }
                 }
             }
@@ -211,9 +215,10 @@ int llopen(LinkLayer connectionParameters) {
             alarmCount = 0;
             if (stateW != STOP_STATE) { return -1;}
 
-            break;
+            break;}
 
         case LlRx: //READ
+            {
             // READ RECEBE
             // Loop for input
             unsigned char bufR[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
@@ -228,13 +233,13 @@ int llopen(LinkLayer connectionParameters) {
                 if(readByteSerialPort(&byte)){
                     switch (stateR) {
                         case START_STATE:
-                            if(byte == FLAG) {
+                            {if(byte == FLAG) {
                                 bufR[0] = byte;
                                 stateR = FLAG_STATE;
                             }
-                            break;
+                            break;}
                         case FLAG_STATE:
-                            if(byte == FLAG) {
+                            {if(byte == FLAG) {
                                 bufR[0] = byte;
                             } else if (byte == ADDRESS_SEND) {
                                 bufR[1] = byte;
@@ -243,9 +248,9 @@ int llopen(LinkLayer connectionParameters) {
                             } else {
                                 stateR = START_STATE;
                             }
-                            break;
+                            break;}
                         case A_STATE:
-                            if(byte == FLAG) {
+                            {if(byte == FLAG) {
                                 bufR[0] = byte;
                                 stateR = FLAG_STATE;
                             } else if (byte == CONTROL_SET) {
@@ -255,9 +260,9 @@ int llopen(LinkLayer connectionParameters) {
                             } else {
                                 stateR = START_STATE;
                             }
-                            break;
+                            break;}
                         case C_STATE:
-                            if(byte == FLAG) {
+                            {if(byte == FLAG) {
                                 bufR[0] = byte;
                                 stateR = FLAG_STATE;
                             } else if (byte == (a_prov2 ^ c_prov2)) {
@@ -266,18 +271,18 @@ int llopen(LinkLayer connectionParameters) {
                             } else {
                                 stateR = START_STATE;
                             }
-                            break;
+                            break;}
                         case BCC_STATE:
-                            if(byte == FLAG) {
+                            {if(byte == FLAG) {
                                 bufR[4] = byte;
                                 stateR = STOP_STATE;
                                 frameCounterReceived++;
                             } else {
                                 stateR = START_STATE;
                             }
-                            break;
+                            break;}
                         default:
-                            break;
+                            {break;}
                         }
                 }
                 
@@ -302,17 +307,17 @@ int llopen(LinkLayer connectionParameters) {
             bufR2[4] = FLAG;
             printf("------------------------------------------------------------------------\n");
             printf("Read UA (llopen) \n");
-            printf("Flag: 0x%02X | Address: 0x%02X | Control: 0x%02X | BCC: 0x%02X | Flag: 0x%02X\n", bufW[0], bufW[1], bufW[2], bufW[3], bufW[4]);
+            printf("Flag: 0x%02X | Address: 0x%02X | Control: 0x%02X | BCC: 0x%02X | Flag: 0x%02X\n", bufR2[0], bufR2[1], bufR2[2], bufR2[3], bufR2[4]);
             int bytesR = writeBytesSerialPort(bufR2, BUF_SIZE);
             printf("%d bytes written (UA)(llopen)\n", bytesR);
             printf("------------------------------------------------------------------------\n");
             frameCounter++;    
             
-            break;
+            break;}
             
-        default:
+        default:{
             printf("ERROR: role unknown");
-            return -1;
+            return -1;}
     }
     return fd;
 
@@ -406,13 +411,13 @@ int llwrite(const unsigned char *buf, int bufSize) {
         if(readByteSerialPort(&byte) > 0){
             switch (statellwrite) {
                 case START_STATE:
-                    if(byte == FLAG) {
+                    {if(byte == FLAG) {
                         bufllwrite[0] = byte;
                         statellwrite = FLAG_STATE;
                     }
-                    break;
+                    break;}
                 case FLAG_STATE:
-                    if(byte == FLAG) {
+                    {if(byte == FLAG) {
                         bufllwrite[0] = byte;
                     } else if (byte == ADDRESS_RECEIVE) {
                         bufllwrite[1] = byte;
@@ -421,9 +426,9 @@ int llwrite(const unsigned char *buf, int bufSize) {
                     } else {
                         statellwrite = START_STATE;
                     }
-                    break;
+                    break;}
                 case A_STATE:
-                    if(byte == FLAG) {
+                    {if(byte == FLAG) {
                         bufllwrite[0] = byte;
                         statellwrite = FLAG_STATE;
                     } else if (Ns_t == 0 && byte == CONTROL_RR1 && Nr_r == 1) {
@@ -447,9 +452,9 @@ int llwrite(const unsigned char *buf, int bufSize) {
                     } else {
                         statellwrite = START_STATE;
                     }
-                    break;
+                    break;}
                 case C_STATE:
-                    if(byte == FLAG) {
+                    {if(byte == FLAG) {
                         bufllwrite[0] = byte;
                         statellwrite = FLAG_STATE;
                     } else if (byte == (a_prov_llwrite ^ c_prov_llwrite)) {
@@ -458,9 +463,9 @@ int llwrite(const unsigned char *buf, int bufSize) {
                     } else {
                        statellwrite = START_STATE;
                     }
-                    break; 
+                    break;} 
                 case BCC_STATE:
-                    if(byte == FLAG) {
+                    {if(byte == FLAG) {
                         bufllwrite[4] = byte;
                         statellwrite = STOP_STATE;
                         frameCounterReceived++;
@@ -468,9 +473,9 @@ int llwrite(const unsigned char *buf, int bufSize) {
                     } else {
                         statellwrite = START_STATE;
                     }
-                    break;
+                    break;}
                 default:
-                    break;
+                    {break;}
             }
         }
     }
@@ -509,12 +514,12 @@ int llread(unsigned char *packet) {
         if(readByteSerialPort(&byte) > 0){
             switch (stateR) {
                 case START_STATE:
-                    if(byte == FLAG) {
+                    {if(byte == FLAG) {
                         stateR = FLAG_STATE;
                     }
-                    break;
+                    break;}
                 case FLAG_STATE:
-                    if(byte == FLAG) {
+                    {if(byte == FLAG) {
                     } else if (byte == ADDRESS_SEND) {
                         a_prov2 = byte;
                         stateR = A_STATE;
@@ -523,9 +528,9 @@ int llread(unsigned char *packet) {
                     } else {
                         stateR = START_STATE;
                     }
-                    break;
+                    break;}
                 case A_STATE:
-                    if(byte == FLAG) {
+                    {if(byte == FLAG) {
                         stateR = FLAG_STATE;
                     } else if ((Ns_t == 0 && byte == CONTROL_I_N0) || (Ns_t == 1 && byte == CONTROL_I_N1)){
                         c_prov2 = byte;
@@ -535,9 +540,9 @@ int llread(unsigned char *packet) {
                     } else {
                         stateR = START_STATE;
                     }
-                    break;
+                    break;}
                 case C_STATE:
-                    if(byte == FLAG) {
+                    {if(byte == FLAG) {
                         stateR = FLAG_STATE;
                     } else if (byte == (a_prov2 ^ c_prov2)) {
                         stateR = BCC_STATE;
@@ -546,9 +551,9 @@ int llread(unsigned char *packet) {
                     } else {
                         stateR = START_STATE;
                     }
-                    break;
+                    break;}
                 case BCC_STATE: // DESTUFF AND BCC CHECKING
-                    if (byte == ESCAPE) {
+                    {if (byte == ESCAPE) {
                         stateR = DESTUFFING_STATE;
                     } else if (byte == FLAG) {
                         unsigned int bcc2 = packet[--i];
@@ -620,9 +625,9 @@ int llread(unsigned char *packet) {
                         packet[i++] = byte;
                     }
 
-                    break;
+                    break;}
                 case DESTUFFING_STATE:
-                    if(byte == XOR_ESCAPE){
+                    {if(byte == XOR_ESCAPE){
                         packet[i++] = ESCAPE;
                         stateR = BCC_STATE;
                     } else if (byte == XOR_FLAG) {
@@ -633,9 +638,9 @@ int llread(unsigned char *packet) {
                         return -1;
                     }
                     
-                    break;
+                    break;}
                 default:
-                    break;
+                    {break;}
                 }
         }
         
@@ -716,13 +721,13 @@ int llclose(int showStatistics) {
             if(readByteSerialPort(&byte) > 0){
                 switch (stateW) {
                     case START_STATE:
-                        if(byte == FLAG) {
+                        {if(byte == FLAG) {
                             bufW2[0] = byte;
                             stateW = FLAG_STATE;
                         }
-                        break;
+                        break;}
                     case FLAG_STATE:
-                        if(byte == FLAG) {
+                        {if(byte == FLAG) {
                             bufW2[0] = byte;
                         } else if (byte == ADDRESS_RECEIVE) {
                             bufW2[1] = byte;
@@ -731,9 +736,9 @@ int llclose(int showStatistics) {
                         } else {
                             stateW = START_STATE;
                         }
-                        break;
+                        break;}
                     case A_STATE:
-                        if(byte == FLAG) {
+                        {if(byte == FLAG) {
                             bufW2[0] = byte;
                             stateW = FLAG_STATE;
                         } else if (byte == CONTROL_DISC) {
@@ -743,9 +748,9 @@ int llclose(int showStatistics) {
                         } else {
                             stateW = START_STATE;
                         }
-                        break;
+                        break;}
                     case C_STATE:
-                        if(byte == FLAG) {
+                        {if(byte == FLAG) {
                             bufW2[0] = byte;
                             stateW = FLAG_STATE;
                         } else if (byte == (a_prov1 ^ c_prov1)) {
@@ -754,9 +759,9 @@ int llclose(int showStatistics) {
                         } else {
                             stateW = START_STATE;
                         }
-                        break;
+                        break;}
                     case BCC_STATE:
-                        if(byte == FLAG) {
+                        {if(byte == FLAG) {
                             bufW2[4] = byte;
                             stateW = STOP_STATE;
                             frameCounterReceived++;
@@ -791,9 +796,9 @@ int llclose(int showStatistics) {
                         } else {
                             stateW = START_STATE;
                         }
-                        break;
+                        break;}
                     default:
-                        break;
+                        {break;}
                 }
             }
         }
@@ -805,7 +810,7 @@ int llclose(int showStatistics) {
 
         break;
     case LlRx: //receiver
-
+{
         // READ RECEBE
         // Loop for input
         unsigned char bufR[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
@@ -820,13 +825,13 @@ int llclose(int showStatistics) {
             if(readByteSerialPort(&byte) > 0){
                 switch (stateR) {
                     case START_STATE:
-                        if(byte == FLAG) {
+                        {if(byte == FLAG) {
                             bufR[0] = byte;
                             stateR = FLAG_STATE;
                         }
-                        break;
+                        break;}
                     case FLAG_STATE:
-                        if(byte == FLAG) {
+                        {if(byte == FLAG) {
                             bufR[0] = byte;
                         } else if (byte == ADDRESS_SEND) {
                             bufR[1] = byte;
@@ -835,9 +840,9 @@ int llclose(int showStatistics) {
                         } else {
                             stateR = START_STATE;
                         }
-                        break;
+                        break;}
                     case A_STATE:
-                        if(byte == FLAG) {
+                        {if(byte == FLAG) {
                             bufR[0] = byte;
                             stateR = FLAG_STATE;
                         } else if (byte == CONTROL_DISC) {
@@ -847,9 +852,9 @@ int llclose(int showStatistics) {
                         } else {
                             stateR = START_STATE;
                         }
-                        break;
+                        break;}
                     case C_STATE:
-                        if(byte == FLAG) {
+                        {if(byte == FLAG) {
                             bufR[0] = byte;
                             stateR = FLAG_STATE;
                         } else if (byte == (a_prov2 ^ c_prov2)) {
@@ -858,18 +863,18 @@ int llclose(int showStatistics) {
                         } else {
                             stateR = START_STATE;
                         }
-                        break;
+                        break;}
                     case BCC_STATE:
-                        if(byte == FLAG) {
+                        {if(byte == FLAG) {
                             bufR[4] = byte;
                             stateR = STOP_STATE;
                             frameCounterReceived++;
                         } else {
                             stateR = START_STATE;
                         }
-                        break;
+                        break;}
                     default:
-                        break;
+                        {break;}
                     }
             }
             
@@ -910,13 +915,13 @@ int llclose(int showStatistics) {
             if(readByteSerialPort(&byte)){
                 switch (stateR) {
                     case START_STATE:
-                        if(byte == FLAG) {
+                        {if(byte == FLAG) {
                             bufR[0] = byte;
                             stateR = FLAG_STATE;
                         }
-                        break;
+                        break;}
                     case FLAG_STATE:
-                        if(byte == FLAG) {
+                        {if(byte == FLAG) {
                             bufR[0] = byte;
                         } else if (byte == ADDRESS_SEND) {
                             bufR[1] = byte;
@@ -925,9 +930,9 @@ int llclose(int showStatistics) {
                         } else {
                             stateR = START_STATE;
                         }
-                        break;
+                        break;}
                     case A_STATE:
-                        if(byte == FLAG) {
+                        {if(byte == FLAG) {
                             bufR[0] = byte;
                             stateR = FLAG_STATE;
                         } else if (byte == CONTROL_UA) {
@@ -937,9 +942,9 @@ int llclose(int showStatistics) {
                         } else {
                             stateR = START_STATE;
                         }
-                        break;
+                        break;}
                     case C_STATE:
-                        if(byte == FLAG) {
+                        {if(byte == FLAG) {
                             bufR[0] = byte;
                             stateR = FLAG_STATE;
                         } else if (byte == (a_prov2 ^ c_prov2)) {
@@ -948,18 +953,18 @@ int llclose(int showStatistics) {
                         } else {
                             stateR = START_STATE;
                         }
-                        break;
+                        break;}
                     case BCC_STATE:
-                        if(byte == FLAG) {
+                        {if(byte == FLAG) {
                             bufR[4] = byte;
                             stateR = STOP_STATE;
                             frameCounterReceived++;
                         } else {
                             stateR = START_STATE;
                         }
-                        break;
+                        break;}
                     default:
-                        break;
+                        {break;}
                     }
             }
             
@@ -974,10 +979,10 @@ int llclose(int showStatistics) {
         printf("------------------------------------------------------------------------\n");
 
         break;
-         
+       }  
     default:
-        printf("error: role unknown");
-        return -1;
+        {printf("error: role unknown");
+        return -1;}
     }
     
     if(showStatistics == TRUE) {
@@ -986,16 +991,16 @@ int llclose(int showStatistics) {
         switch (connectionParametersCopy.role)
         {
         case LlTx:
-            printf("Transmitter sent %u frames in this file transfer.\n", frameCounter);
+            {printf("Transmitter sent %u frames in this file transfer.\n", frameCounter);
             printf("Transmitter collected %u frames in this file transfer.\n", frameCounterReceived);
-            break;
+            break;}
         case LlRx:
-            printf("Receiver sent %u frames in this file transfer.\n", frameCounter);
+            {printf("Receiver sent %u frames in this file transfer.\n", frameCounter);
             printf("Receiver collected %u frames in this file transfer.\n", frameCounterReceived);
-            break;
+            break;}
     
         default:
-            break;
+            {break;}
         }
         printf("------------------------------------------------------------------------\n");
     }
