@@ -58,6 +58,8 @@ int Nr_r = 1; // Receiver
 int frameCounter = 0;
 int frameCounterReceived = 0;
 
+int counterNotSets = 0;
+
 // Alarm function handler
 void alarmHandler(int signal) {
    alarmEnabled = FALSE;
@@ -535,6 +537,25 @@ int llread(unsigned char *packet) {
                     } else if ((Ns_t == 0 && byte == CONTROL_I_N0) || (Ns_t == 1 && byte == CONTROL_I_N1)){
                         c_prov2 = byte;
                         stateR = C_STATE;
+                        counterNotSets++;
+                    } else if (byte == CONTROL_SET && counterNotSets == 0){
+                        //READ RESPONDE DE VOLTA
+                        // Create string to send
+                        unsigned char bufR[BUF_SIZE];
+                        unsigned char BCC1R = ADDRESS_RECEIVE ^ CONTROL_UA;
+                        bufR[0] = FLAG;
+                        bufR[1] = ADDRESS_RECEIVE; //0X01
+                        bufR[2] = CONTROL_UA; //0X07
+                        bufR[3] = BCC1R;
+                        bufR[4] = FLAG;
+                        printf("------------------------------------------------------------------------\n");
+                        printf("Read UA again (llopen) \n");
+                        printf("Flag: 0x%02X | Address: 0x%02X | Control: 0x%02X | BCC: 0x%02X | Flag: 0x%02X\n", bufR[0], bufR[1], bufR[2], bufR[3], bufR[4]);
+                        int bytesR = writeBytesSerialPort(bufR, BUF_SIZE);
+                        printf("%d bytes written (UA)(llopen)\n", bytesR);
+                        printf("------------------------------------------------------------------------\n");
+                        frameCounter++;
+                        stateR = START_STATE;
                     } else if (byte == 0x00) {
                         // Ignore and stay
                     } else {
