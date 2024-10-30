@@ -39,7 +39,6 @@ typedef enum {
     C_STATE,
     BCC_STATE,
     STOP_STATE,
-    PRE_STOP_STATE,
     DESTUFFING_STATE
 } state_t;
 
@@ -531,23 +530,11 @@ int llread(unsigned char *packet) {
                     } else if ((Ns_t == 0 && byte == CONTROL_I_N0) || (Ns_t == 1 && byte == CONTROL_I_N1)){
                         c_prov2 = byte;
                         stateR = C_STATE;
-                    } else if (byte == CONTROL_DISC ) {
-                        stateR = PRE_STOP_STATE;
-                        
                     } else if (byte == 0x00) {
                         // Ignore and stay
                     } else {
                         stateR = START_STATE;
                     }
-                    break;
-                case PRE_STOP_STATE:
-                    if(byte == FLAG) {
-                        stateR = STOP_STATE;
-                        return 5;
-                    } else {
-                        stateR = START_STATE;
-                    }
-                    break;
                     break;
                 case C_STATE:
                     if(byte == FLAG) {
