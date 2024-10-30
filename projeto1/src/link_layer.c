@@ -564,6 +564,10 @@ int llread(unsigned char *packet) {
                             bcc_calculo = bcc_calculo ^ packet[j];
                         }
 
+                        /*printf("-------AAAAAAAAAAAAAAAA-----------------------------------------------------------------\n");
+                        printf("%d\n", bcc2);
+                        printf("%d\n", bcc_calculo);
+                        printf("-------AAAAAAAAAAAAAAAA-----------------------------------------------------------------\n");*/
                         if(bcc2 == bcc_calculo) { // TUDO CORRECTO YAYYYYYYY
                             stateR = STOP_STATE;
                             frameCounterReceived++;
@@ -602,6 +606,8 @@ int llread(unsigned char *packet) {
                             return i;
                         } else {
                             //responder erro :(
+
+
                             if (Nr_r == 0){ // rejeitar com REJ0
                                 unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_REJ0, ADDRESS_RECEIVE ^ CONTROL_REJ0, FLAG};
                                 writeBytesSerialPort(frame, 5);
@@ -612,6 +618,9 @@ int llread(unsigned char *packet) {
                                 printf("------------------------------------------------------------------------\n");
                                 frameCounter++;
                                 stateR = START_STATE;
+                                bcc2 = 0;
+                                memset(packet, 0, i);
+                                i = 0;
                             } else { // rejeitar com REJ1
                                 unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_REJ1, ADDRESS_RECEIVE ^ CONTROL_REJ1, FLAG};
                                 writeBytesSerialPort(frame, 5);
@@ -622,6 +631,9 @@ int llread(unsigned char *packet) {
                                 printf("------------------------------------------------------------------------\n");
                                 frameCounter++; 
                                 stateR = START_STATE;
+                                bcc2 = 0;
+                                memset(packet, 0, i);
+                                i = 0;
                             }
                         }
 
