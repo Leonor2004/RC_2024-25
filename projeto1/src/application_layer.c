@@ -15,7 +15,13 @@
 unsigned char * createControlPacket(const char* filename, int fileSize, unsigned int* controlPacketSize, const unsigned int cField) {
     // The 'log2f' finds the number of bits needed to represent 'fileSize', and dividing by 8 converts bits to bytes.
     // 'ceil' ensures we round up to the nearest whole number of bytes.
-    const int L1 = (int) ceil(log2f((float)fileSize)/8.0); // Number of bytes needed to store the file size
+    //const int L1 = (int) ceil(log2f((float)fileSize)/8.0); // Number of bytes needed to store the file size
+    int L1 = 0;
+    unsigned long tempSize = fileSize;
+    while (tempSize > 0) {
+        L1++;
+        tempSize >>= 8;
+    }
     
     const int L2 = strlen(filename); // Number of bytes needed to store the file name
     
@@ -71,7 +77,7 @@ unsigned char* analyseControlPacket(unsigned char* packet, int sizePacket) {
         receivedFilesize |= (tempAux[L1-i-1] << (8*i));
     }
 
-    unsigned char L2 = packet[3+L1+1]; // size of filename content
+    unsigned char L2 = packet[3+L1+1]; // size of filename contents
     unsigned char* receivedFilename = (unsigned char*) malloc (L2);
     memcpy(receivedFilename, packet+3+L1+1+1, L2);
     return receivedFilename;

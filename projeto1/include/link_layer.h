@@ -4,17 +4,6 @@
 #ifndef _LINK_LAYER_H_
 #define _LINK_LAYER_H_
 
-typedef enum {
-    START_STATE,
-    FLAG_STATE,
-    A_STATE,
-    C_STATE,
-    BCC_STATE,
-    STOP_STATE,
-    PRE_STOP_STATE,
-    DESTUFFING_STATE
-} state_t;
-
 typedef enum
 {
     LlTx,

@@ -32,6 +32,17 @@
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 
+typedef enum {
+    START_STATE,
+    FLAG_STATE,
+    A_STATE,
+    C_STATE,
+    BCC_STATE,
+    STOP_STATE,
+    PRE_STOP_STATE,
+    DESTUFFING_STATE
+} state_t;
+
 LinkLayer connectionParametersCopy;
 
 int Ns_t = 0;  // Transmiter
