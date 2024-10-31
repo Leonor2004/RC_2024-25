@@ -66,7 +66,7 @@ unsigned char * createDataPacket(unsigned char* payload, int payloadSize, unsign
     return packet;
 }
 
-unsigned char* analyseControlPacket(unsigned char* packet, int sizePacket) {
+void analyseControlPacket(unsigned char* packet, int sizePacket, unsigned char* receivedFilename) {
     
     unsigned char receivedFilesize;
     unsigned char L1 = packet [2]; // size of fileSize content
@@ -78,9 +78,8 @@ unsigned char* analyseControlPacket(unsigned char* packet, int sizePacket) {
     }
 
     unsigned char L2 = packet[3+L1+1]; // size of filename contents
-    unsigned char* receivedFilename = (unsigned char*) malloc (L2);
+    receivedFilename = (unsigned char*) malloc (L2);
     memcpy(receivedFilename, packet+3+L1+1+1, L2);
-    return receivedFilename;
 }
 
 
@@ -183,7 +182,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
                 sizePacket = llread(packet);
             }
             
-            unsigned char* receivedFilename = analyseControlPacket(packet, sizePacket);
+            unsigned char* receivedFilename;
+            analyseControlPacket(packet, sizePacket, receivedFilename);
 
             FILE* fileReceived = fopen((char*) filename, "wb+"); // Open an empty binary file for both reading and writing. (If file exists its contents are destroyed)
             if (fileReceived==NULL) printf("ERROR: fileReceived failed to open\n");

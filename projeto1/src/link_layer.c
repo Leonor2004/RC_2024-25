@@ -108,10 +108,9 @@ int llopen(LinkLayer connectionParameters) {
             frameCounter++;
 
             //WRITE RECEBE DE VOLTA
-        
-            // Wait until all bytes have been written to the serial port
-            sleep(5);
             (void)signal(SIGALRM, alarmHandler);
+            alarmEnabled = FALSE;
+            alarmCount = 0;
 
             // Loop for input
             unsigned char bufW2[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
@@ -384,14 +383,16 @@ int llwrite(const unsigned char *buf, int bufSize) {
     printf("------------------------------------------------------------------------\n");
     frameCounter++;
 
-    // Loop for input
+    //WRITE RECEBE DE VOLTA
+    (void)signal(SIGALRM, alarmHandler);
+    alarmEnabled = FALSE;
+    alarmCount = 0;
     unsigned char bufllwrite[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
 
     state_t statellwrite = START_STATE;
     int a_prov_llwrite = 0;
     int c_prov_llwrite = 0;
-    alarmEnabled = FALSE;
-    alarmCount = 0;
+    
 
     while(statellwrite != STOP_STATE && alarmCount < connectionParametersCopy.nRetransmissions) {
 
@@ -450,9 +451,21 @@ int llwrite(const unsigned char *buf, int bufSize) {
                     } else if (Ns_t == 0 && byte == CONTROL_REJ0 && Nr_r == 1) {
                         statellwrite = START_STATE;
                         alarmEnabled = FALSE;
+                        printf("------------------------------------------------------------------------\n");
+                        printf("Write I again (recived a REJ0) (llwrite)\n");
+                        int bytesW = writeBytesSerialPort(frame, k);
+                        printf("%d bytes written (llwrite)\n", bytesW);
+                        printf("------------------------------------------------------------------------\n");
+                        frameCounter++;
                     } else if (Ns_t == 1 && byte == CONTROL_REJ1 && Nr_r == 0) {
                         statellwrite = START_STATE;
                         alarmEnabled = FALSE;
+                        printf("------------------------------------------------------------------------\n");
+                        printf("Write I again (recived a REJ1) (llwrite)\n");
+                        int bytesW = writeBytesSerialPort(frame, k);
+                        printf("%d bytes written (llwrite)\n", bytesW);
+                        printf("------------------------------------------------------------------------\n");
+                        frameCounter++;
                     } else {
                         statellwrite = START_STATE;
                     }
@@ -587,15 +600,9 @@ int llread(unsigned char *packet) {
                             bcc_calculo = bcc_calculo ^ packet[j];
                         }
 
-                        /*printf("-------AAAAAAAAAAAAAAAA-----------------------------------------------------------------\n");
-                        printf("%d\n", bcc2);
-                        printf("%d\n", bcc_calculo);
-                        printf("-------AAAAAAAAAAAAAAAA-----------------------------------------------------------------\n");*/
-                        if(bcc2 == bcc_calculo) { // TUDO CORRECTO YAYYYYYYY
+                        if(bcc2 == bcc_calculo) {
                             stateR = STOP_STATE;
                             frameCounterReceived++;
-                            
-                            //responder :)
                             if (Nr_r == 0){ // responder com RR0
                                 unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_RR0, ADDRESS_RECEIVE ^ CONTROL_RR0, FLAG};
                                 writeBytesSerialPort(frame, 5);
@@ -624,16 +631,8 @@ int llread(unsigned char *packet) {
                                 memcpy(lastFrame, frame, sizeof(frame));
                                 
                             }
-                            /*printf("recebi do write (llread) : ");
-                            for (int j = 0; j < i; i++){
-                                printf("0x%02X |", frame[j]);
-                            } 
-                            printf("\n");*/
                             return i;
                         } else {
-                            //responder erro :(
-
-
                             if (Nr_r == 0){ // rejeitar com REJ0
                                 unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_REJ0, ADDRESS_RECEIVE ^ CONTROL_REJ0, FLAG};
                                 writeBytesSerialPort(frame, 5);
@@ -698,8 +697,7 @@ int llclose(int showStatistics) {
     switch (connectionParametersCopy.role)
     {
     case LlTx: // transmiter
-        {//WRITE ESCREVE
-        sleep(1);
+        {
         unsigned char bufW[BUF_SIZE];
 
         unsigned char BCC1W = ADDRESS_SEND ^ CONTROL_DISC;
@@ -717,9 +715,6 @@ int llclose(int showStatistics) {
         frameCounter++;
 
         //WRITE RECEBE DE VOLTA
-    
-        // Wait until all bytes have been written to the serial port
-        sleep(5);
         (void)signal(SIGALRM, alarmHandler);
         alarmEnabled = FALSE;
         alarmCount = 0;
@@ -856,12 +851,6 @@ int llclose(int showStatistics) {
         // READ RECEBE
         // Loop for input
         unsigned char bufR[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
-
-        printf("------------------------------------------------------------------------\n");
-        printf("Last frame is:  (llclose)\n");
-        printf("Flag: 0x%02X | Address: 0x%02X | Control: 0x%02X | BCC: 0x%02X | Flag: 0x%02X\n", lastFrame[0], lastFrame[1], lastFrame[2], lastFrame[3], lastFrame[4]);
-        printf("%d bytes written (RR1)(llread)\n", 5);
-        printf("------------------------------------------------------------------------\n");
 
         state_t stateR = START_STATE;
         int a_prov2 = 0;
