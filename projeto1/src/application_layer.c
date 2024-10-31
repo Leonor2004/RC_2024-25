@@ -5,17 +5,19 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
 #include <fenv.h>
+#include <time.h>
+
+extern clock_t startTotal, endTotal;
+extern clock_t start, end;
+
 
 
 unsigned char * createControlPacket(const char* filename, int fileSize, unsigned int* controlPacketSize, const unsigned int cField) {
-    // The 'log2f' finds the number of bits needed to represent 'fileSize', and dividing by 8 converts bits to bytes.
-    // 'ceil' ensures we round up to the nearest whole number of bytes.
-    //const int L1 = (int) ceil(log2f((float)fileSize)/8.0); // Number of bytes needed to store the file size
+
     int L1 = 0;
     unsigned long tempSize = fileSize;
     while (tempSize > 0) {
@@ -32,12 +34,10 @@ unsigned char * createControlPacket(const char* filename, int fileSize, unsigned
     packet[1] = 0; // Marking that we are going to place info of file size. (T1)
     packet[2] = L1; // Set the size of the fileSize content.
     
-    // Now we insert the file size ('fileSize') into the packet, byte by byte (little-endian order).
-    // The loop writes the least significant byte of 'fileSize' first, then shifts right by 8 bits
-    // and repeats until 'L1' bytes are filled in the packet.
+
     for (unsigned char i = 0; i < L1; i++) {
-        packet[2+L1-i] = fileSize & 0xFF;  // Write the least significant byte of 'length'.
-        fileSize>>=8;                      // Shift 'length' to the right by 8 bits.
+        packet[2+L1-i] = fileSize & 0xFF;  // Write the least significant byte of length.
+        fileSize>>=8;                      // Shift length to the right by 8 bits.
     }
 
     int packetPosition = 2 + L1;
@@ -46,11 +46,11 @@ unsigned char * createControlPacket(const char* filename, int fileSize, unsigned
     packet[packetPosition] = L2; // Set the size of the filename content.
     packetPosition++;
 
-    // Now we copy the filename into the packet at the current position.
-    // The 'memcpy' function copies 'L2' bytes from 'filename' to 'packet + packetposition'.
     memcpy(packet+packetPosition, filename, L2); // Copy the filename into the packet.
     return packet;
 }
+
+
 
 unsigned char * createDataPacket(unsigned char* payload, int payloadSize, unsigned int* dataPacketSize, unsigned char sequenceNumber) {
     
@@ -58,7 +58,7 @@ unsigned char * createDataPacket(unsigned char* payload, int payloadSize, unsign
     
     unsigned char *packet = (unsigned char*)malloc(*dataPacketSize);
     packet[0] = 2; // Control field (value: 2 -> data)
-    packet[1] = sequenceNumber; // Set the 'sequenceNumber' field of the data packet.
+    packet[1] = sequenceNumber; // Set the sequenceNumber field of the data packet.
     packet[2] = payloadSize / 256; // Set L2.
     packet[3] = payloadSize % 256; // Set L1.
 
@@ -66,25 +66,28 @@ unsigned char * createDataPacket(unsigned char* payload, int payloadSize, unsign
     return packet;
 }
 
+
+
 void analyseControlPacket(unsigned char* packet, int sizePacket, unsigned char* receivedFilename) {
     
     unsigned char receivedFilesize;
-    unsigned char L1 = packet [2]; // size of fileSize content
-    unsigned char tempAux[L1]; // Auxiliar array to store the fileSize content
-    memcpy(tempAux, packet+3, L1); // Copy the fileSize content into tempAux
+    unsigned char L1 = packet [2]; // Size of fileSize content.
+    unsigned char tempAux[L1]; // Auxiliar array to store the fileSize content.
+    memcpy(tempAux, packet+3, L1); // Copy the fileSize content into tempAux.
     
     for (unsigned char i = 0; i < L1; i++) {
         receivedFilesize |= (tempAux[L1-i-1] << (8*i));
     }
 
-    unsigned char L2 = packet[3+L1+1]; // size of filename contents
+    unsigned char L2 = packet[3+L1+1]; // Size of filename contents.
     receivedFilename = (unsigned char*) malloc (L2);
     memcpy(receivedFilename, packet+3+L1+1+1, L2);
 }
 
 
-void applicationLayer(const char *serialPort, const char *role, int baudRate, int nTries, int timeout, const char *filename) {
 
+void applicationLayer(const char *serialPort, const char *role, int baudRate, int nTries, int timeout, const char *filename) {
+    startTotal = clock();
     LinkLayer connectionParameters;
 
     switch (role[0]) {
@@ -109,6 +112,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
         return;
     }
 
+    start = clock();
     switch (connectionParameters.role) {
         case LlTx:
         {
@@ -117,14 +121,14 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
                 perror("ERROR: file not found\n");
                 return;
             }
-            int prev = ftell(file); // Store current position
-            fseek(file,0L,SEEK_END); // Go to end of file
-            long int fileSize = ftell(file) - prev; // Get file size
-            fseek(file,prev,SEEK_SET); // Go back to previous position
+            int prev = ftell(file); // Store current position.
+            fseek(file,0L,SEEK_END); // Go to end of file.
+            long int fileSize = ftell(file) - prev; // Get file size.
+            fseek(file,prev,SEEK_SET); // Go back to previous position.
 
 
             unsigned int startingCPSize; // Control packet size
-            unsigned char *startingControlPacket = createControlPacket(filename, fileSize, &startingCPSize, 1); // Get start control packet
+            unsigned char *startingControlPacket = createControlPacket(filename, fileSize, &startingCPSize, 1); // Get start control packet.
 
             // Send data in buf with size bufSize.
             if (llwrite(startingControlPacket, startingCPSize) == -1) {
@@ -135,8 +139,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
 
             unsigned char sequenceNum = 0;
             long int bytesRemaining = fileSize;
-            unsigned char* content = (unsigned char* ) malloc (sizeof(unsigned char) * fileSize); // Allocate memory for file content
-            fread(content, 1, fileSize, file); // Read file content into buffer
+            unsigned char* content = (unsigned char* ) malloc (sizeof(unsigned char) * fileSize); // Allocate memory for file content.
+            fread(content, 1, fileSize, file); // Read file content into buffer.
             
             while (bytesRemaining > 0) {
                 
@@ -147,10 +151,10 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
                     payloadSize = bytesRemaining;
                 }
 
-                unsigned char* payload = (unsigned char* ) malloc(payloadSize); // Allocate memory for payload
-                memcpy(payload, content, payloadSize); // Copy payload from content buffer
+                unsigned char* payload = (unsigned char* ) malloc(payloadSize); // Allocate memory for payload.
+                memcpy(payload, content, payloadSize); // Copy payload from content buffer.
                 
-                unsigned int dataPacketSize; // Data packet size
+                unsigned int dataPacketSize; // Data packet size.
                 unsigned char *dataPacket = createDataPacket(payload, payloadSize, &dataPacketSize, sequenceNum);
 
                 if (llwrite(dataPacket, dataPacketSize) == -1) {
@@ -164,9 +168,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
                 content += payloadSize;
             }
 
-            unsigned int endingCPSize; // Control packet size
-            unsigned char *endingControlPacket = createControlPacket(filename, fileSize, &endingCPSize, 3); // Get start control packet
-            // Send data in buf with size bufSize.
+            unsigned int endingCPSize; // Control packet size.
+            unsigned char *endingControlPacket = createControlPacket(filename, fileSize, &endingCPSize, 3); // Get start control packet.
             if (llwrite(endingControlPacket, endingCPSize) == -1) {
                 printf("ERROR: llwrite ending failed");
                 return;
@@ -174,8 +177,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
             break;}
 
         case LlRx:
-{
-            unsigned char* packet = (unsigned char* ) malloc(MAX_PAYLOAD_SIZE); // Allocate memory for packet
+            {
+            unsigned char* packet = (unsigned char* ) malloc(MAX_PAYLOAD_SIZE); // Allocate memory for packet.
             
             int sizePacket = -1;
             while (sizePacket == -1) {
@@ -200,13 +203,12 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
                 int K = (256*L2) + L1;
 
                 if(sizePacket2 == 0) {break;}
-                else if (packet[0] == 3) {
+                else if (packet[0] == 3) { // An end control packet
                     break;
                 }
-                else if (packet[0] != 3) {  // If it is not an end control packet
+                else if (packet[0] != 3) {  // Not an end control packet
                     unsigned char *bufReceived = (unsigned char* ) malloc (K);
                     memcpy(bufReceived,packet+4,K);
-                    // bufReceived += sizePacket2+4;
                     fwrite(bufReceived, sizeof(unsigned char), K, fileReceived);
                     free(bufReceived);
                 }
@@ -221,6 +223,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
             {printf("ERROR: role unknown");
             return;}
     }
+    end = clock();
 
     if(llclose(TRUE) == -1) {
         printf("ERROR: llclose failed");

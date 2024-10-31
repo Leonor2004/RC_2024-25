@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <termios.h>
 #include <unistd.h>
+#include <time.h>
 
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
@@ -31,8 +32,18 @@
 
 int alarmEnabled = FALSE;
 int alarmCount = 0;
+int retransmitionsCount = 0;
+
+int byteCount = 0;
+int alarmTotalAlarmCount = 0;
 
 unsigned char lastFrame[5];
+
+
+double total_time_used;
+double time_used;
+clock_t startTotal, endTotal;
+clock_t start, end;
 
 typedef enum {
     START_STATE,
@@ -62,35 +73,91 @@ int frameCounterReceived = 0;
 
 int counterNotSets = 0;
 
+
+
 // Alarm function handler
 void alarmHandler(int signal) {
    alarmEnabled = FALSE;
    alarmCount++;
+   alarmTotalAlarmCount++;
 
    printf("Alarm #%d\n", alarmCount);
 }
+
+
+
+// Auxiliar function no resent the UA in case of necessity
+int resendUA(){
+    // READ WAITS FOR SET
+    state_t stateR = C_STATE;
+    int a_prov2 = ADDRESS_SEND;
+    int c_prov2 = CONTROL_SET;
+
+    while(stateR != STOP_STATE) {
+        unsigned char byte;
+        if(readByteSerialPort(&byte)){
+            byteCount++;
+            switch (stateR) {
+                case C_STATE:
+                    {if(byte == FLAG) {
+                        stateR = FLAG_STATE;
+                    } else if (byte == (a_prov2 ^ c_prov2)) {
+                        stateR = BCC_STATE;
+                    } else {
+                        stateR = STOP_STATE;
+                    }
+                    break;}
+                case BCC_STATE:
+                    {if(byte == FLAG) {
+                        stateR = STOP_STATE;
+                        frameCounterReceived++;
+                        //READ RESPONDE DE VOLTA
+                        unsigned char bufR2[BUF_SIZE];
+                        unsigned char BCC1R = ADDRESS_RECEIVE ^ CONTROL_UA;
+                        bufR2[0] = FLAG;
+                        bufR2[1] = ADDRESS_RECEIVE; //0X01
+                        bufR2[2] = CONTROL_UA; //0X07
+                        bufR2[3] = BCC1R;
+                        bufR2[4] = FLAG;
+                        printf("------------------------------------------------------------------------\n");
+                        printf("Read UA again (llopen -> resendUA) \n");
+                        printf("Flag: 0x%02X | Address: 0x%02X | Control: 0x%02X | BCC: 0x%02X | Flag: 0x%02X\n", bufR2[0], bufR2[1], bufR2[2], bufR2[3], bufR2[4]);
+                        int bytesR = writeBytesSerialPort(bufR2, BUF_SIZE);
+                        printf("%d bytes written (UA)(llopen)\n", bytesR);
+                        printf("------------------------------------------------------------------------\n");
+                        frameCounter++;
+                    } else {
+                        stateR = STOP_STATE;
+                    }
+                    break;}
+                default:
+                    {break;}
+                }
+        }
+        
+    }
+
+}
+
 
 
 ////////////////////////////////////////////////
 // LLOPEN
 ////////////////////////////////////////////////
 int llopen(LinkLayer connectionParameters) {
+
     int fd = openSerialPort(connectionParameters.serialPort, connectionParameters.baudRate);
     if (fd < 0) { return -1;}
     connectionParametersCopy.role = connectionParameters.role;
     connectionParametersCopy.baudRate = connectionParameters.baudRate;
-    connectionParametersCopy.nRetransmissions = connectionParameters.nRetransmissions;
-    //connectionParametersCopy.serialPort = connectionParameters.serialPort;
+    connectionParametersCopy.nRetransmissions =  connectionParameters.nRetransmissions;
     connectionParametersCopy.timeout = connectionParameters.timeout;
 
     switch (connectionParameters.role) {
 
         case LlTx:
         {
-        
-         //WRITE
-
-            //WRITE ESCREVE
+            //WRITE WRITES INICIAL SET
             unsigned char bufW[BUF_SIZE];
   
             unsigned char BCC1W = ADDRESS_SEND ^ CONTROL_SET;
@@ -107,14 +174,12 @@ int llopen(LinkLayer connectionParameters) {
             printf("------------------------------------------------------------------------\n");
             frameCounter++;
 
-            //WRITE RECEBE DE VOLTA
+
+            //WRITE WAITS FOR UA
             (void)signal(SIGALRM, alarmHandler);
             alarmEnabled = FALSE;
             alarmCount = 0;
-
-            // Loop for input
             unsigned char bufW2[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
-
             state_t stateW = START_STATE;
             int a_prov1 = 0;
             int c_prov1 = 0;
@@ -123,8 +188,8 @@ int llopen(LinkLayer connectionParameters) {
 
                 if (alarmEnabled == FALSE) {
                     if(alarmCount != 0){
+                        //WRITE REWRITES SET
                         unsigned char bufW[BUF_SIZE];
-
                         unsigned char BCC1W = ADDRESS_SEND ^ CONTROL_SET;
                         bufW[0] = FLAG;
                         bufW[1] = ADDRESS_SEND; //0X03
@@ -140,8 +205,7 @@ int llopen(LinkLayer connectionParameters) {
                         frameCounter++;
                     }
                     
-                    //printf("alarme do write\n");
-                    alarm(connectionParameters.timeout); // Set alarm to be triggered in Xs
+                    alarm(connectionParameters.timeout);
                     alarmEnabled = TRUE;
                     
                 }
@@ -220,20 +284,18 @@ int llopen(LinkLayer connectionParameters) {
 
             break;}
 
-        case LlRx: //READ
+        case LlRx:
             {
-            // READ RECEBE
-            // Loop for input
+            // READ WAITS FOR SET
             unsigned char bufR[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
-
             state_t stateR = START_STATE;
             int a_prov2 = 0;
             int c_prov2 = 0;
 
             while(stateR != STOP_STATE) {
                 unsigned char byte;
-
                 if(readByteSerialPort(&byte)){
+                    byteCount++;
                     switch (stateR) {
                         case START_STATE:
                             {if(byte == FLAG) {
@@ -300,7 +362,6 @@ int llopen(LinkLayer connectionParameters) {
             printf("------------------------------------------------------------------------\n");
 
             //READ RESPONDE DE VOLTA
-            // Create string to send
             unsigned char bufR2[BUF_SIZE];
             unsigned char BCC1R = ADDRESS_RECEIVE ^ CONTROL_UA;
             bufR2[0] = FLAG;
@@ -326,6 +387,8 @@ int llopen(LinkLayer connectionParameters) {
 
 }
 
+
+
 ////////////////////////////////////////////////
 // LLWRITE
 ////////////////////////////////////////////////
@@ -333,13 +396,13 @@ int llwrite(const unsigned char *buf, int bufSize) {
 
     unsigned int sizeOfFrame = bufSize + 6; // 6 = 2*FLAG + ADDRESS + CONTROL + BCC1 + BCC2
     unsigned char *frame = (unsigned char *) malloc(sizeOfFrame);
-    frame[0] = FLAG; //flag
-    frame[1] = ADDRESS_SEND; //A = 0X03
+    frame[0] = FLAG; // Flag
+    frame[1] = ADDRESS_SEND; // A = 0X03
     
     if (Ns_t == 0){
-        frame[2] = CONTROL_I_N0; //C = 0x00
+        frame[2] = CONTROL_I_N0; // C = 0x00
     } else if (Ns_t == 1) {
-        frame[2] = CONTROL_I_N1; //C = 0x80
+        frame[2] = CONTROL_I_N1; // C = 0x80
     } else {
         printf("ERROR: INFO FRAME C\n");
         return -1;
@@ -347,17 +410,17 @@ int llwrite(const unsigned char *buf, int bufSize) {
     
     frame[3] = frame[1] ^ frame[2]; // A^C
     
-    memcpy (frame+4, buf, bufSize); //D1...Dn
+    memcpy (frame+4, buf, bufSize); // D1...Dn
     
     int k = 4;
     for(int i = 0; i < bufSize; i++){
-        if(buf[i] == FLAG){ // se 0x7e -> 0x7d 0x5e
+        if(buf[i] == FLAG){ // If 0x7e -> 0x7d 0x5e
             frame = realloc(frame,++sizeOfFrame);
             frame[k] = ESCAPE;
             k++;
             frame[k] = XOR_FLAG;
             k++;
-        } else if (buf[i] == ESCAPE) {  // se 0x7d -> 0x7d 0x5dc
+        } else if (buf[i] == ESCAPE) {  // If 0x7d -> 0x7d 0x5dc
             frame = realloc(frame,++sizeOfFrame);
             frame[k] = ESCAPE;
             k++; 
@@ -371,9 +434,25 @@ int llwrite(const unsigned char *buf, int bufSize) {
 
     unsigned char BCC2 = buf[0];
     for (unsigned int i = 1 ; i < bufSize ; i++) { BCC2 = BCC2 ^ buf[i]; } // BCC2 = D1^D2^...^Dn
-    frame[k] = BCC2;
-    k++;
-    frame[k] = FLAG; //flag
+
+    if(BCC2 == FLAG){ // If 0x7e -> 0x7d 0x5e
+        frame = realloc(frame,++sizeOfFrame);
+        frame[k] = ESCAPE;
+        k++;
+        frame[k] = XOR_FLAG;
+        k++;
+    } else if (BCC2 == ESCAPE) {  // If 0x7d -> 0x7d 0x5dc
+        frame = realloc(frame,++sizeOfFrame);
+        frame[k] = ESCAPE;
+        k++; 
+        frame[k] = XOR_ESCAPE;
+        k++;
+    } else {
+        frame[k] = BCC2;
+        k++;
+    }
+
+    frame[k] = FLAG; // Flag
     k++;
 
     printf("------------------------------------------------------------------------\n");
@@ -388,14 +467,12 @@ int llwrite(const unsigned char *buf, int bufSize) {
     alarmEnabled = FALSE;
     alarmCount = 0;
     unsigned char bufllwrite[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
-
     state_t statellwrite = START_STATE;
     int a_prov_llwrite = 0;
     int c_prov_llwrite = 0;
     
 
     while(statellwrite != STOP_STATE && alarmCount < connectionParametersCopy.nRetransmissions) {
-
         if (alarmEnabled == FALSE) {
             if(alarmCount != 0){
                 printf("------------------------------------------------------------------------\n");
@@ -406,13 +483,11 @@ int llwrite(const unsigned char *buf, int bufSize) {
                 frameCounter++;
             }
             
-            ///printf("alarme do write\n");
-            alarm(connectionParametersCopy.timeout); // Set alarm to be triggered in Xs
+            alarm(connectionParametersCopy.timeout);
             alarmEnabled = TRUE;
         }
 
         unsigned char byte;
-
         if(readByteSerialPort(&byte) > 0){
             switch (statellwrite) {
                 case START_STATE:
@@ -509,17 +584,19 @@ int llwrite(const unsigned char *buf, int bufSize) {
     
     alarmEnabled = FALSE;
     alarmCount = 0;
-    if(statellwrite == STOP_STATE) {return sizeOfFrame;} // correto
+    if(statellwrite == STOP_STATE) {return sizeOfFrame;}
 
     return -1;
 }
+
+
 
 ////////////////////////////////////////////////
 // LLREAD
 ////////////////////////////////////////////////
 int llread(unsigned char *packet) {
+    
     // READ RECEBE
-    // Loop for input
     state_t stateR = START_STATE;
     int a_prov2 = 0;
     int c_prov2 = 0;
@@ -527,8 +604,8 @@ int llread(unsigned char *packet) {
 
     while(stateR != STOP_STATE) {
         unsigned char byte;
-
         if(readByteSerialPort(&byte) > 0){
+            byteCount++;
             switch (stateR) {
                 case START_STATE:
                     {if(byte == FLAG) {
@@ -554,22 +631,7 @@ int llread(unsigned char *packet) {
                         stateR = C_STATE;
                         counterNotSets++;
                     } else if (byte == CONTROL_SET && counterNotSets == 0){
-                        //READ RESPONDE DE VOLTA
-                        // Create string to send
-                        unsigned char bufR[BUF_SIZE];
-                        unsigned char BCC1R = ADDRESS_RECEIVE ^ CONTROL_UA;
-                        bufR[0] = FLAG;
-                        bufR[1] = ADDRESS_RECEIVE; //0X01
-                        bufR[2] = CONTROL_UA; //0X07
-                        bufR[3] = BCC1R;
-                        bufR[4] = FLAG;
-                        printf("------------------------------------------------------------------------\n");
-                        printf("Read UA again (llopen) \n");
-                        printf("Flag: 0x%02X | Address: 0x%02X | Control: 0x%02X | BCC: 0x%02X | Flag: 0x%02X\n", bufR[0], bufR[1], bufR[2], bufR[3], bufR[4]);
-                        int bytesR = writeBytesSerialPort(bufR, BUF_SIZE);
-                        printf("%d bytes written (UA)(llopen)\n", bytesR);
-                        printf("------------------------------------------------------------------------\n");
-                        frameCounter++;
+                        resendUA();
                         stateR = START_STATE;
                     } else if (byte == 0x00) {
                         // Ignore and stay
@@ -594,7 +656,6 @@ int llread(unsigned char *packet) {
                     } else if (byte == FLAG) {
                         unsigned int bcc2 = packet[--i];
                         packet[i] = '\0';
-
                         unsigned int bcc_calculo = packet[0];
                         for(int j = 1 ; j<i ; j++){
                             bcc_calculo = bcc_calculo ^ packet[j];
@@ -603,7 +664,7 @@ int llread(unsigned char *packet) {
                         if(bcc2 == bcc_calculo) {
                             stateR = STOP_STATE;
                             frameCounterReceived++;
-                            if (Nr_r == 0){ // responder com RR0
+                            if (Nr_r == 0){ // Respond with RR0
                                 unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_RR0, ADDRESS_RECEIVE ^ CONTROL_RR0, FLAG};
                                 writeBytesSerialPort(frame, 5);
                                 printf("------------------------------------------------------------------------\n");
@@ -616,7 +677,7 @@ int llread(unsigned char *packet) {
                                 Ns_t = 0;
                                 stateR = STOP_STATE;
                                 memcpy(lastFrame, frame, sizeof(frame));
-                            } else { // responder com RR1
+                            } else { // Respond with RR1
                                 unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_RR1, ADDRESS_RECEIVE ^ CONTROL_RR1, FLAG};
                                 writeBytesSerialPort(frame, 5);
                                 printf("------------------------------------------------------------------------\n");
@@ -633,7 +694,7 @@ int llread(unsigned char *packet) {
                             }
                             return i;
                         } else {
-                            if (Nr_r == 0){ // rejeitar com REJ0
+                            if (Nr_r == 0){ // Reject with REJ0
                                 unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_REJ0, ADDRESS_RECEIVE ^ CONTROL_REJ0, FLAG};
                                 writeBytesSerialPort(frame, 5);
                                 printf("------------------------------------------------------------------------\n");
@@ -646,7 +707,7 @@ int llread(unsigned char *packet) {
                                 bcc2 = 0;
                                 memset(packet, 0, i);
                                 i = 0;
-                            } else { // rejeitar com REJ1
+                            } else { // Reject with REJ1
                                 unsigned char frame[5] = {FLAG, ADDRESS_RECEIVE, CONTROL_REJ1, ADDRESS_RECEIVE ^ CONTROL_REJ1, FLAG};
                                 writeBytesSerialPort(frame, 5);
                                 printf("------------------------------------------------------------------------\n");
@@ -665,7 +726,6 @@ int llread(unsigned char *packet) {
                     } else {
                         packet[i++] = byte;
                     }
-
                     break;}
                 case DESTUFFING_STATE:
                     {if(byte == XOR_ESCAPE){
@@ -689,14 +749,16 @@ int llread(unsigned char *packet) {
     return -1;
 }
 
+
+
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
-int llclose(int showStatistics) {    
-
+int llclose(int showStatistics) {
+        
     switch (connectionParametersCopy.role)
     {
-    case LlTx: // transmiter
+    case LlTx:
         {
         unsigned char bufW[BUF_SIZE];
 
@@ -718,10 +780,7 @@ int llclose(int showStatistics) {
         (void)signal(SIGALRM, alarmHandler);
         alarmEnabled = FALSE;
         alarmCount = 0;
-
-        // Loop for input
         unsigned char bufW2[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
-
         state_t stateW = START_STATE;
         int a_prov1 = 0;
         int c_prov1 = 0;
@@ -747,8 +806,7 @@ int llclose(int showStatistics) {
                     frameCounter++;
                 }
                 
-                // printf("alarme do write\n");
-                alarm(connectionParametersCopy.timeout); // Set alarm to be triggered in Xs
+                alarm(connectionParametersCopy.timeout);
                 alarmEnabled = TRUE;
                 
             }
@@ -812,9 +870,7 @@ int llclose(int showStatistics) {
                             printf("\n");  
                             printf("------------------------------------------------------------------------\n");   
 
-                            //printf("write vai escrever\n");
                             unsigned char bufAU[BUF_SIZE];
-
                             unsigned char BCC1AU = ADDRESS_SEND ^ CONTROL_UA;
                             bufAU[0] = FLAG;
                             bufAU[1] = ADDRESS_SEND; //0X03
@@ -846,20 +902,18 @@ int llclose(int showStatistics) {
         if (stateW != STOP_STATE) { return -1;}
 
         break;}
-    case LlRx: //receiver
-{
+    case LlRx:
+        {
         // READ RECEBE
-        // Loop for input
         unsigned char bufR[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
-
         state_t stateR = START_STATE;
         int a_prov2 = 0;
         int c_prov2 = 0;
 
         while(stateR != STOP_STATE) {
             unsigned char byte;
-
             if(readByteSerialPort(&byte) > 0){
+                byteCount++;
                 switch (stateR) {
                     case START_STATE:
                         {if(byte == FLAG) {
@@ -928,7 +982,6 @@ int llclose(int showStatistics) {
         printf("------------------------------------------------------------------------\n");
 
         //READ RESPONDE DE VOLTA
-        // Create string to send
         unsigned char bufR2[BUF_SIZE];
         unsigned char BCC1R = ADDRESS_RECEIVE ^ CONTROL_DISC;
         bufR2[0] = FLAG;
@@ -950,8 +1003,8 @@ int llclose(int showStatistics) {
 
         while(stateR != STOP_STATE) {
             unsigned char byte;
-
             if(readByteSerialPort(&byte)){
+                byteCount++;
                 switch (stateR) {
                     case START_STATE:
                         {if(byte == FLAG) {
@@ -1021,21 +1074,44 @@ int llclose(int showStatistics) {
        }  
     default:
         {printf("error: role unknown");
+
         return -1;}
     }
     
+    endTotal = clock();
+    time_used = ((double)(end - start))/CLOCKS_PER_SEC;
+    total_time_used = ((double)(endTotal - startTotal))/CLOCKS_PER_SEC;
+
     if(showStatistics == TRUE) {
         printf("\n");
+        printf("\n");
         printf("------------------------------------------------------------------------\n");
+        printf("STATISTICS: \n");
+        printf("\n");
         switch (connectionParametersCopy.role)
         {
         case LlTx:
             {printf("Transmitter sent %u frames in this file transfer.\n", frameCounter);
             printf("Transmitter collected %u frames in this file transfer.\n", frameCounterReceived);
+            printf("\n");
+            printf("Transmitter took %f seconds to execute the whole program.\n", total_time_used);
+            printf("Transmitter took %f seconds to transmit the file. \n", time_used);
+            printf("\n");
+            printf("Transmitter made %u alarms.\n", alarmTotalAlarmCount);
+            printf("Transmitter made %u retransmitions.\n", retransmitionsCount);
             break;}
         case LlRx:
-            {printf("Receiver sent %u frames in this file transfer.\n", frameCounter);
+            {
+            int bitCount = byteCount*8;
+            double bitPerSec = bitCount/total_time_used;
+            double bytePerSec = byteCount/total_time_used;    
+            printf("Receiver sent %u frames in this file transfer.\n", frameCounter);
             printf("Receiver collected %u frames in this file transfer.\n", frameCounterReceived);
+            printf("\n");
+            printf("Receiver took %f seconds to execute the whole program.\n", total_time_used);
+            printf("Receiver took %f seconds to receive the file. \n", time_used);
+            printf("\n");
+            printf("Receiver's rate of received data: %f bit/s (%f bytes/s). \n", bitPerSec, bytePerSec); 
             break;}
     
         default:
