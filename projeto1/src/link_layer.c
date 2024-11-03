@@ -87,7 +87,7 @@ void alarmHandler(int signal) {
 
 
 // Auxiliar function no resent the UA in case of necessity
-int resendUA(){
+void resendUA(){
     // READ WAITS FOR SET
     state_t stateR = C_STATE;
     int a_prov2 = ADDRESS_SEND;
@@ -184,7 +184,7 @@ int llopen(LinkLayer connectionParameters) {
             int a_prov1 = 0;
             int c_prov1 = 0;
 
-            while(stateW != STOP_STATE && alarmCount < connectionParameters.nRetransmissions) {
+            while(stateW != STOP_STATE && retransmitionsCount < connectionParameters.nRetransmissions) {
 
                 if (alarmEnabled == FALSE) {
                     if(alarmCount != 0){
@@ -203,6 +203,7 @@ int llopen(LinkLayer connectionParameters) {
                         printf("%d bytes written (SET)(llopen)\n", bytesW);
                         printf("------------------------------------------------------------------------\n");
                         frameCounter++;
+                        retransmitionsCount++;
                     }
                     
                     alarm(connectionParameters.timeout);
@@ -259,6 +260,7 @@ int llopen(LinkLayer connectionParameters) {
                                 bufW2[4] = byte;
                                 stateW = STOP_STATE;
                                 frameCounterReceived++;
+                                retransmitionsCount = 0;
                                 alarm(0);
                             } else {
                                 stateW = START_STATE;
@@ -472,7 +474,7 @@ int llwrite(const unsigned char *buf, int bufSize) {
     int c_prov_llwrite = 0;
     
 
-    while(statellwrite != STOP_STATE && alarmCount < connectionParametersCopy.nRetransmissions) {
+    while(statellwrite != STOP_STATE && retransmitionsCount < connectionParametersCopy.nRetransmissions) {
         if (alarmEnabled == FALSE) {
             if(alarmCount != 0){
                 printf("------------------------------------------------------------------------\n");
@@ -481,6 +483,7 @@ int llwrite(const unsigned char *buf, int bufSize) {
                 printf("%d bytes written (llwrite)\n", bytesW);
                 printf("------------------------------------------------------------------------\n");
                 frameCounter++;
+                retransmitionsCount++;
             }
             
             alarm(connectionParametersCopy.timeout);
@@ -532,6 +535,9 @@ int llwrite(const unsigned char *buf, int bufSize) {
                         printf("%d bytes written (llwrite)\n", bytesW);
                         printf("------------------------------------------------------------------------\n");
                         frameCounter++;
+                        alarm(0);
+                        retransmitionsCount = 0;
+                        alarmCount = 0;
                     } else if (Ns_t == 1 && byte == CONTROL_REJ1 && Nr_r == 0) {
                         statellwrite = START_STATE;
                         alarmEnabled = FALSE;
@@ -541,6 +547,9 @@ int llwrite(const unsigned char *buf, int bufSize) {
                         printf("%d bytes written (llwrite)\n", bytesW);
                         printf("------------------------------------------------------------------------\n");
                         frameCounter++;
+                        alarm(0);
+                        retransmitionsCount = 0;
+                        alarmCount = 0;
                     } else {
                         statellwrite = START_STATE;
                     }
@@ -561,6 +570,7 @@ int llwrite(const unsigned char *buf, int bufSize) {
                         bufllwrite[4] = byte;
                         statellwrite = STOP_STATE;
                         frameCounterReceived++;
+                        retransmitionsCount = 0;
                         alarm(0);
                     } else {
                         statellwrite = START_STATE;
@@ -785,7 +795,7 @@ int llclose(int showStatistics) {
         int a_prov1 = 0;
         int c_prov1 = 0;
 
-        while(stateW != STOP_STATE && alarmCount < connectionParametersCopy.nRetransmissions) {
+        while(stateW != STOP_STATE && retransmitionsCount < connectionParametersCopy.nRetransmissions) {
 
             if (alarmEnabled == FALSE) {
                 if(alarmCount != 0){
@@ -804,6 +814,7 @@ int llclose(int showStatistics) {
                     printf("%d bytes written (DISC)(llclose)\n", bytesW);
                     printf("------------------------------------------------------------------------\n");
                     frameCounter++;
+                    retransmitionsCount++;
                 }
                 
                 alarm(connectionParametersCopy.timeout);
@@ -884,7 +895,7 @@ int llclose(int showStatistics) {
                             printf("%d bytes written (UA)(llclose)\n", bytesAU);
                             printf("------------------------------------------------------------------------\n");
                             frameCounter++;
-
+                            retransmitionsCount = 0;
 
                         } else {
                             stateW = START_STATE;
@@ -1098,7 +1109,6 @@ int llclose(int showStatistics) {
             printf("Transmitter took %f seconds to transmit the file. \n", time_used);
             printf("\n");
             printf("Transmitter made %u alarms.\n", alarmTotalAlarmCount);
-            printf("Transmitter made %u retransmitions.\n", retransmitionsCount);
             break;}
         case LlRx:
             {
