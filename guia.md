@@ -1,4 +1,3 @@
-# lab4
 bancada 11
 
 cabo:
@@ -69,7 +68,6 @@ no tux4:
 
 --------------------------------------------------------------------------
 
-//passo1:
 cabos:
     ether1 of RC to the lab network on PY.12
     ether2 of RC to a port on bridgeY1 - 22
@@ -126,3 +124,5 @@ no tux3: (não deve responde)
 router console: 
     /ip firewall nat enable 0
 
+
+(neste momento está igual ao lab4, mas vai mudar)
