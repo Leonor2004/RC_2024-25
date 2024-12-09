@@ -5,7 +5,6 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <sys/socket.h>
-#include "../include/download.h"
 
 #define BUFFER_SIZE 1024
 
@@ -18,6 +17,23 @@ PASSIVE_MODE_CODE 227
 START_TRANSFER_CODE 150
 TRANSFER_COMPLETED_CODE 226 
 */
+
+#define LOGED_IN_CODE 220
+#define PASSWORD_CODE 331
+#define LOGIN_SUCCESSFULL_CODE 230
+#define PASSIVE_MODE_CODE 227
+#define START_TRANSFER_CODE 150
+#define TRANSFER_COMPLETED_CODE 226
+#define N_TRIES 3
+
+#define AT              "%*[^/]//%s@"
+#define HOST_REGEX      "%*[^/]//%[^/]"
+#define HOST_AT_REGEX   "%*[^/]//%*[^@]@%[^/]"
+#define PATH_REGEX  "%*[^/]//%*[^/]/%s"
+#define USER_REGEX      "%*[^/]//%[^:/]"
+#define PASS_REGEX      "%*[^/]//%*[^:]:%[^@\n$]"
+#define PASSIVE_REGEX   "%*[^(](%d,%d,%d,%d,%d,%d)%*[^\n$)]"
+
 
 // Function prototypes
 int connect_to_server(const char *host, int port);
@@ -58,10 +74,10 @@ int main(int argc, char *argv[]) {
 
     // Set default values
     if (strcmp(user, "") == 0){
-        strcpy(user, USER_DEAFAULT);
+        strcpy(user, "anonymous");
     }
     if(strcmp(password, "") == 0){
-        strcpy(password, PASS_DEAFAULT);
+        strcpy(password, "anonymous");
     }
 
     //Print the information
@@ -142,55 +158,42 @@ int main(int argc, char *argv[]) {
  */
 int connect_to_server(const char *host, int port) {
     struct addrinfo hints; // Criteria for selecting socket addresses
+    struct addrinfo *res;  // Where the result is saved
+    struct addrinfo *prov2; // Pointer to iterate throung the list of potential addresses
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET; // Specify address family and socket type
     hints.ai_socktype = SOCK_STREAM;
-
-    struct addrinfo *res; // Where the result is saved
 
     // Save the port number as a string
     char port_str[6];
     snprintf(port_str, sizeof(port_str), "%d", port);
 
     // getaddrinfo -> Get a list of potential addresses
-    int prov = getaddrinfo(host, port_str, &hints, &res);
-    if (prov != 0) { // 0 in getaddrinfo is the sucess, othewise gives an nonzero error codes
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(prov));
+    if (getaddrinfo(host, port_str, &hints, &res) != 0) { // 0 in getaddrinfo is the sucess, othewise gives an nonzero error codes
+        perror("getaddrinfo failed");
         return -1;
     }
 
-    struct addrinfo *prov2; // Pointer to iterate throung the list of potential addresses
-    char s[INET6_ADDRSTRLEN]; // Store the human-readable IP address
-
-    // socket - paramethers form the first address in the list
-    int sockfd = socket(prov2->ai_family, prov2->ai_socktype,prov2->ai_protocol);
-    for(prov2 = res; prov2 != NULL; prov2 = prov2->ai_next) { // Iterate the addresses
-        if (sockfd == -1) {
-            perror("Client: socket");
+    int sockfd = -1;
+    for (prov2 = res; prov2 != NULL; prov2 = prov2->ai_next) { // Iterate the addresses
+        sockfd = socket(prov2->ai_family, prov2->ai_socktype, prov2->ai_protocol);
+        
+        if (sockfd == -1) { // Next for
             continue;
         }
 
-        if (connect(sockfd, prov2->ai_addr, prov2->ai_addrlen) == -1) { // Connect the socket to the address
-            close(sockfd);
-            perror("Client: connect");
-            continue;
+        if (connect(sockfd, prov2->ai_addr, prov2->ai_addrlen) == 0) { // Connect the socket to the address
+            break; // Success
         }
 
-        break;
+        close(sockfd);
+        sockfd = -1;
     }
 
-    if (prov2 == NULL) { // No addrress worked for connection
-        fprintf(stderr, "Client: Failed to connect\n");
-        return -1;
-    }
-
-    // Convert address to the human-readable string
-    inet_ntop(prov2->ai_family, (void *)&((struct sockaddr_in *)prov2->ai_addr)->sin_addr, s, sizeof s);
-    printf("client: connecting to %s\n", s);
-
-    freeaddrinfo(res);
+    freeaddrinfo(res); // Clean
     return sockfd;
 }
+
 
 /**
  * @brief Read the response from the server

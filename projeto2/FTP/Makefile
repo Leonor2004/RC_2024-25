@@ -2,24 +2,23 @@ CC = gcc
 CFLAGS = -Wall
 
 SRC = src
-BIN = bin
 
 URL = ftp://anonymous:anonymous@mirrors.up.pt/debian/README.html
 
 # Targets
 .PHONY: all
-all: $(BIN)/download
+all: download
 
-$(BIN)/download:  $(SRC)/download.c
+download:  $(SRC)/download.c
 	$(CC) $(CFLAGS) -o $@ $^
 
 .PHONY: run
-run: $(BIN)/download
+run: download
 	./$< $(URL)
 
 .PHONY: clean
 clean:
-	rm -f $(BIN)/download
+	rm -f download
 
 # Files to download
 
@@ -29,7 +28,7 @@ clean:
 
 # ftp://anonymous:anonymous@mirrors.up.pt/debian/README.html -> working
 
-# netlab1 -> not working general problem not ours
+# netlab1 -> not working
 # ftp://rcom:rcom@netlab1.fe.up.pt/pipe.txt
 # ftp://rcom:rcom@netlab1.fe.up.pt/files/crab.mp4
 # ftp://rcom:rcom@netlab1.fe.up.pt/debian/ls-lR.gz
