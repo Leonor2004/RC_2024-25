@@ -115,14 +115,24 @@ no tux2:
 no tux3: (deve responder)
     ping 172.16.1.10
 
-router console: 
-    /ip firewall nat disable 0
+deu certo o router : done/not done
 
-no tux3: (não deve responde)
-    ping 172.16.1.10
+--------------------------------------------------------------------------
 
-router console: 
-    /ip firewall nat enable 0
+Em todos os Tuxs, adicionar a seguinte linha ao ficheiro /etc/resolv.conf
+nameserver 172.16.1.1
+
+Em todos os Tux, fazer ping do google para verificar se podem ser usados nomes como host
+ping google.com
+
+deu certo o ping em todos: done/not done
+
+--------------------------------------------------------------------------
+
+final? -> experiencia 6 a usar o nosso FTP protocol
 
 
-(neste momento está igual ao lab4, mas vai mudar)
+
+exp 6: (No Tux53, fazer o download de um ficheiro do servidor FTP. Guardar a captura obtida com o WireShark.
+
+No Tux53 e no Tux52, fazer o download de um ficheiro do servidor FTP ao mesmo tempo. Guardar a captura obtida com o WireShark.)

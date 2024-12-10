@@ -1,3 +1,5 @@
+NÃO FINAL
+
 # Bancada 12
 ## Cabos:
 - tux2 E1 -> 2

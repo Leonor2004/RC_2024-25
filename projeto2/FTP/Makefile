@@ -5,7 +5,6 @@ SRC = src
 
 URL = ftp://anonymous:anonymous@mirrors.up.pt/debian/README.html
 
-# Targets
 .PHONY: all
 all: download
 
@@ -28,7 +27,7 @@ clean:
 
 # ftp://anonymous:anonymous@mirrors.up.pt/debian/README.html -> working
 
-# netlab1 -> not working
+# netlab1 -> not tested yet, only in RCOM room
 # ftp://rcom:rcom@netlab1.fe.up.pt/pipe.txt
 # ftp://rcom:rcom@netlab1.fe.up.pt/files/crab.mp4
 # ftp://rcom:rcom@netlab1.fe.up.pt/debian/ls-lR.gz

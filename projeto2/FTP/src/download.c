@@ -24,12 +24,12 @@ TRANSFER_COMPLETED_CODE 226
 #define PASSIVE_MODE_CODE 227
 #define START_TRANSFER_CODE 150
 #define TRANSFER_COMPLETED_CODE 226
-#define N_TRIES 3
+#define NUM_TRIES 3 // Number of tries to read response
 
 #define AT              "%*[^/]//%s@"
 #define HOST_REGEX      "%*[^/]//%[^/]"
 #define HOST_AT_REGEX   "%*[^/]//%*[^@]@%[^/]"
-#define PATH_REGEX  "%*[^/]//%*[^/]/%s"
+#define PATH_REGEX      "%*[^/]//%*[^/]/%s"
 #define USER_REGEX      "%*[^/]//%[^:/]"
 #define PASS_REGEX      "%*[^/]//%*[^:]:%[^@\n$]"
 #define PASSIVE_REGEX   "%*[^(](%d,%d,%d,%d,%d,%d)%*[^\n$)]"
@@ -54,6 +54,11 @@ int parse_url(char * url, char * username, char * password, char * host, char * 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         printf("Error: Missing URL as argument!\n");
+        return EXIT_FAILURE;
+    }
+
+    if (NUM_TRIES <= 0) {
+        printf("Error: Number of tries to read response has to be more than 0!\n");
         return EXIT_FAILURE;
     }
 
@@ -102,7 +107,7 @@ int main(int argc, char *argv[]) {
 
     if(!response_code) { // Problems
         return -1;
-    } else if(response_code == 230) { // Already logged in
+    } else if(response_code == LOGIN_SUCCESSFULL_CODE) { // Already logged in
         printf("Already Logged in \n");
         return 0;
     }
@@ -148,6 +153,7 @@ int main(int argc, char *argv[]) {
 
     return EXIT_SUCCESS;
 }
+
 
 /**
  * @brief Connects to the server
@@ -204,27 +210,29 @@ int connect_to_server(const char *host, int port) {
  * @return int : Always returns 0 (when it finds an empty response, it prints "Empty response")
  */
 int read_response (int socket, char * response, int response_len){
-    int total_bytes_read = 0, bytes_read = 0;
-    int n_tries = N_TRIES;
-    usleep(100000);
+    int total_bytes_read = 0, bytes_read = 0; // Where the number of total and partial bytes read will be saved
+    int n_tries = NUM_TRIES; // Numbered of tries
+    usleep(100000); // Wait for a bit to ensure it can start with no problems
 
-    // Read form server
-    while (n_tries) {
+    // Read form server while number of tries > 0
+    while (n_tries > 0) {
         // Try to read data from the socket
         bytes_read = recv(socket, response + total_bytes_read,response_len - total_bytes_read, MSG_DONTWAIT);
-        if(bytes_read <=0) { //error
+        
+        if(bytes_read <= 0) { // Error, no bytes read
             n_tries--;
             usleep(100000);
-        } else {
-            n_tries = N_TRIES;
+        } else { // Could read bytes, yay
+            n_tries = NUM_TRIES;
         }
 
         // Accumulate the total bytes read 
         total_bytes_read += bytes_read;
+        bytes_read = 0; // Clean before next iteration in case of problems
     }
 
     response[total_bytes_read] = '\0';
-    if(total_bytes_read > 0) { // Pint the response or no response
+    if(total_bytes_read > 0) { // Print the response or no response
         printf("Server Response: %s\n", response); 
     } else {
         printf("Empty response\n");
@@ -232,6 +240,7 @@ int read_response (int socket, char * response, int response_len){
 
     return 0;
 }
+
 
 /**
  * @brief Read the response code from the server
@@ -250,13 +259,14 @@ int read_response_code(int socket){
     return response_code;
 }
 
+
 /**
  * @brief Entering passive mode
  * 
- * @param sockfd : 
- * @param ip : 
- * @param port : 
- * @return int : 1 sucess an
+ * @param sockfd : Socket
+ * @param ip : IP
+ * @param port : Port
+ * @return int : 1 on success and 0 on error
  */
 int enter_passive_mode(int sockfd, char *ip, int *port) {
     char buffer[BUFFER_SIZE]; // Buffer to save the response
@@ -282,6 +292,12 @@ int enter_passive_mode(int sockfd, char *ip, int *port) {
 }
 
 
+/**
+ * @brief This function downloads the file from the data socket to our final file
+ * 
+ * @param data_sock : Data socket
+ * @param filename : File name
+ */
 void download_file(int data_sock, const char *filename) {
     FILE *file = fopen(filename, "wb"); // Open file in wb mode
 
@@ -301,6 +317,7 @@ void download_file(int data_sock, const char *filename) {
     fclose(file); // Close file
 }
 
+
 /**
  * @brief Get the filename
  * 
@@ -308,14 +325,13 @@ void download_file(int data_sock, const char *filename) {
  * @return const char* : Pointer to the filename portion of the path
  */
 const char *get_filename(const char *path) {
-
     const char *filename = strrchr(path, '/'); // Find the last /
-
     return (filename != NULL) ? filename + 1 : path;
 }
 
+
 /**
- * @brief 
+ * @brief This function parses the URL
  * 
  * @param url : URL given
  * @param username : Where the username will be stored
