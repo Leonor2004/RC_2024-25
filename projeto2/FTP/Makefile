@@ -1,14 +1,13 @@
 CC = gcc
 CFLAGS = -Wall
 
-SRC = src
 
 URL = ftp://anonymous:anonymous@mirrors.up.pt/debian/README.html
 
 .PHONY: all
 all: download
 
-download:  $(SRC)/download.c
+download:  download.c
 	$(CC) $(CFLAGS) -o $@ $^
 
 .PHONY: run
@@ -28,7 +27,4 @@ clean:
 # ftp://anonymous:anonymous@mirrors.up.pt/debian/README.html -> working
 
 # netlab1 -> not tested yet, only in RCOM room
-# ftp://rcom:rcom@netlab1.fe.up.pt/pipe.txt
-# ftp://rcom:rcom@netlab1.fe.up.pt/files/crab.mp4
-# ftp://rcom:rcom@netlab1.fe.up.pt/debian/ls-lR.gz
-# ftp://rcom:rcom@netlab1.fe.up.pt/pub/parrot/iso/testing/Parrot-architect-5.3_amd64.iso
+# ftp://rcom:rcom@netlab.fe.up.pt/README
