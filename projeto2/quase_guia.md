@@ -1,3 +1,4 @@
+# Guiao
 bancada 11
 
 cabo:
@@ -13,19 +14,19 @@ cabo:
 
 gtkTerm -> /system reset-configuration
 
-creating as bridges:
-    /interface bridge add name=bridge110
-    /interface bridge add name=bridge111
-    /interface bridge print
+    creating as bridges:
+        /interface bridge add name=bridge110
+        /interface bridge add name=bridge111
+        /interface bridge print
 
-remove the ports
-    /interface bridge port remove [find interface =ether3]
-    /interface bridge port remove [find interface =ether4]
+    remove the ports
+        /interface bridge port remove [find interface =ether3]
+        /interface bridge port remove [find interface =ether4]
 
-add the ports to the corresponding bridges
-    /interface bridge port add bridge=bridge110 interface=ether3
-    /interface bridge port add bridge=bridge110 interface=ether4
-    /interface bridge port print
+    add the ports to the corresponding bridges
+        /interface bridge port add bridge=bridge110 interface=ether3
+        /interface bridge port add bridge=bridge110 interface=ether4
+        /interface bridge port print
 
 - 3 -> ping 172.16.110.254
 - 4 -> ping 172.16.110.1
@@ -79,13 +80,14 @@ gtk:
 cabo:
     mudar o cabo da porta serie para o router
 
-gtk: /system reset-configuration
+gtk:
+    /system reset-configuration
     /ip address add address=172.16.1.119/24 interface=ether1
     /ip address add address=172.16.111.254/24 interface=ether2
 
-- 2 -> route add default gw 172.16.111.254
-- 3 -> route add default gw 172.16.110.254
-- 4 -> route add default gw 172.16.111.254
+- 3 -> route add -net 172.16.1.0/24 gw 172.16.110.254
+- 2 -> route add -net 172.16.1.0/24 gw 172.16.111.254
+- 4 -> route add -net 172.16.1.0/24 gw 172.16.111.254
 
 gtk:
     /ip route add dst-address=172.16.110.0/24 gateway=172.16.111.253
@@ -103,9 +105,12 @@ no tux2:
 
     route del -net 172.16.110.0 gw 172.16.111.253 netmask 255.255.255.0
 
+    route add -net 172.16.110.0/24 gw 172.16.111.254
+
     ping 172.16.110.1
 
     traceroute -n 172.16.110.1 -> temos print
+    sudo ip route del 172.16.110.0 via 172.16.111.254 (o outro n funcionou...)
     route add -net 172.16.110.0/24 gw 172.16.111.253
     traceroute -n 172.16.110.1 -> temos print 2
 
@@ -122,6 +127,11 @@ deu certo o router : done/not done
 Em todos os Tuxs, adicionar a seguinte linha ao ficheiro /etc/resolv.conf
 nameserver 172.16.1.1
 
+o que estava default num dos pcs:
+domain netlab.fe.up.pt
+search netlab.fe.up.pt
+nameserver 10.227.20.3
+
 Em todos os Tux, fazer ping do google para verificar se podem ser usados nomes como host
 ping google.com
 
@@ -133,6 +143,6 @@ final? -> experiencia 6 a usar o nosso FTP protocol
 
 
 
-exp 6: (No Tux53, fazer o download de um ficheiro do servidor FTP. Guardar a captura obtida com o WireShark.
+exp 6: (No Tux53, fazer o download de um ficheiro do servidor FTP. Guardar a captura obtida com o WireShark. -> temos
 
 No Tux53 e no Tux52, fazer o download de um ficheiro do servidor FTP ao mesmo tempo. Guardar a captura obtida com o WireShark.)

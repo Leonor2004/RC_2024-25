@@ -40,7 +40,7 @@ int connect_to_server(const char *host, int port);
 int read_response_code(int sockfd);
 int read_response (int socket, char * response, int response_len);
 int enter_passive_mode(int sockfd, char *ip, int *port);
-void download_file(int data_sock, const char *filename);
+void download_file(int control_sock, int data_sock, const char *filename);
 const char *get_filename(const char *path);
 int parse_url(char * url, char * username, char * password, char * host, char * path);
 
@@ -146,10 +146,9 @@ int main(int argc, char *argv[]) {
 
 
     // Download the file using the extracted filename
-    download_file(data_sock, filename);
+    download_file(control_sock, data_sock, filename);
 
-    close(data_sock);
-    close(control_sock);
+    close(control_sock); // Close control socket
 
     return EXIT_SUCCESS;
 }
@@ -295,10 +294,11 @@ int enter_passive_mode(int sockfd, char *ip, int *port) {
 /**
  * @brief This function downloads the file from the data socket to our final file
  * 
+ * @param control_sock : Control socket
  * @param data_sock : Data socket
  * @param filename : File name
  */
-void download_file(int data_sock, const char *filename) {
+void download_file(int control_sock, int data_sock, const char *filename) {
     FILE *file = fopen(filename, "wb"); // Open file in wb mode
 
     if (!file) { // Problems opening the file
@@ -315,6 +315,17 @@ void download_file(int data_sock, const char *filename) {
     }
 
     fclose(file); // Close file
+
+    // Check if the file was downloaded successfully TODO
+    /*int code;
+    if((code = read_response_code(control_sock)) != TRANSFER_COMPLETED_CODE) {
+        printf(stderr, "Error downloading file\n");
+        printf("responce code: %d", code);
+    } else {
+        printf("File downloaded successfully\n");
+    }*/
+
+    close(data_sock); // Close data socket
 }
 
 

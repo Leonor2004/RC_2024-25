@@ -85,9 +85,9 @@ gtk: /system reset-configuration
     /ip address add address=172.16.1.119/24 interface=ether1
     /ip address add address=172.16.111.254/24 interface=ether2
 
-- 2 -> route add default gw 172.16.111.254
-- 3 -> route add default gw 172.16.110.254
-- 4 -> route add default gw 172.16.111.254
+- 3 -> route add -net 172.16.1.0/24 gw 172.16.110.254
+- 2 -> route add -net 172.16.1.0/24 gw 172.16.111.254
+- 4 -> route add -net 172.16.1.0/24 gw 172.16.111.254
 
 gtk:
     /ip route add dst-address=172.16.110.0/24 gateway=172.16.111.253
@@ -105,9 +105,12 @@ no tux2:
 
     route del -net 172.16.110.0 gw 172.16.111.253 netmask 255.255.255.0
 
+    route add -net 172.16.110.0/24 gw 172.16.111.254
+
     ping 172.16.110.1
 
     traceroute -n 172.16.110.1 -> temos print
+    sudo ip route del 172.16.110.0 via 172.16.111.254 (o outro n funcionou...)
     route add -net 172.16.110.0/24 gw 172.16.111.253
     traceroute -n 172.16.110.1 -> temos print 2
 

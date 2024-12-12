@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall
 
 
-URL = ftp://anonymous:anonymous@mirrors.up.pt/debian/README.html
+URL = ftp://demo:password@test.rebex.net/readme.txt
 
 .PHONY: all
 all: download
@@ -26,5 +26,5 @@ clean:
 
 # ftp://anonymous:anonymous@mirrors.up.pt/debian/README.html -> working
 
-# netlab1 -> not tested yet, only in RCOM room
-# ftp://rcom:rcom@netlab.fe.up.pt/README
+# netlab1 -> deuuuuuuuu
+# ftp://rcom:rcom@ftp.netlab.fe.up.pt/README
