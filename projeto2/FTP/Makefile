@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall
 
 
-URL = ftp://demo:password@test.rebex.net/readme.txt
+URL = ftp://anonymous:anonymous@mirrors.up.pt/debian/README.html
 
 .PHONY: all
 all: download
