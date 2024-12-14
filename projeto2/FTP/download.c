@@ -8,42 +8,30 @@
 
 #define BUFFER_SIZE 1024
 
-/*
-Codes:
-LOGED_IN_CODE 220
-PASSWORD_CODE 331
-LOGIN_SUCCESSFULL_CODE 230
-PASSIVE_MODE_CODE 227
-START_TRANSFER_CODE 150
-TRANSFER_COMPLETED_CODE 226 
-*/
+#define LOGED_IN 220 // Some servers cut the code and only return 20
+#define USERNAME_OK_PASSWORD_NOW 331 // Some servers cut the code and only return 31
+#define LOGIN_GOOD 230 // Some servers cut the code and only return 30
+#define START_TRANSFER 150
+#define DATA_CONNECTION_ESTABLISHED 125
+#define TRANSFER_COMPLETED 226
+#define NUMBER_TRIES 3 // Number of tries to read response
 
-#define LOGED_IN_CODE 220
-#define USERNAME_OK_PASSWORD_NOW 331
-#define LOGIN_SUCCESSFULL_CODE 230
-#define PASSIVE_MODE_CODE 227
-#define START_TRANSFER_CODE 150
-#define DATA_CONNECTION_ESTABLISHED_CODE 125
-#define TRANSFER_COMPLETED_CODE 226
-#define NUM_TRIES 3 // Number of tries to read response
-
-#define AT              "%*[^/]//%s@"
-#define HOST_REGEX      "%*[^/]//%[^/]"
-#define HOST_AT_REGEX   "%*[^/]//%*[^@]@%[^/]"
-#define PATH_REGEX      "%*[^/]//%*[^/]/%s"
-#define USER_REGEX      "%*[^/]//%[^:/]"
-#define PASS_REGEX      "%*[^/]//%*[^:]:%[^@\n$]"
-#define PASSIVE_REGEX   "%*[^(](%d,%d,%d,%d,%d,%d)%*[^\n$)]"
-
+#define EXTRACT_AT       "%*[^/]//%s@"
+#define EXTRACT_HOST     "%*[^/]//%[^/]"
+#define EXTRACT_HOST_AT  "%*[^/]//%*[^@]@%[^/]"
+#define EXTRACT_PATH     "%*[^/]//%*[^/]/%s"
+#define EXTRACT_USER     "%*[^/]//%[^:/]"
+#define EXTRACT_PASS     "%*[^/]//%*[^:]:%[^@\n$]"
+#define EXTRACT_PASSIVE  "%*[^(](%d,%d,%d,%d,%d,%d)%*[^\n$)]"
 
 // Function prototypes
-int connect_to_server(const char *host, int port);
-int read_response_code(int sockfd);
+int connecting_server(const char *host, int port);
+int read_code(int sockfd);
 int read_response (int socket, char * response, int response_len);
-int enter_passive_mode(int sockfd, char *ip, int *port);
-void download_file(int data_sock, const char *filename);
+int passive_mode(int sockfd, char *ip, int *port);
+void file_download(int data_sock, const char *filename);
 const char *get_filename(const char *path);
-int parse_url(char * url, char * username, char * password, char * host, char * path);
+int url_parse(char * url, char * username, char * password, char * host, char * path);
 
 /**
  * @brief Main function: FTP protocol
@@ -58,7 +46,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (NUM_TRIES <= 0) {
+    if (NUMBER_TRIES <= 0) {
         printf("Error: Number of tries to read response has to be more than 0!\n");
         return EXIT_FAILURE;
     }
@@ -70,7 +58,7 @@ int main(int argc, char *argv[]) {
     char filepath[256] = "";
 
     // Parse the URL
-    if (parse_url(argv[1], user, password, host, filepath) < 0) {
+    if (url_parse(argv[1], user, password, host, filepath) < 0) {
         printf("Invalid URL: %s!\n", argv[1]);
         return -1;
     }
@@ -98,28 +86,28 @@ int main(int argc, char *argv[]) {
     printf("------------------------------------------------------------\n");
 
     // Connect to the FTP server
-    int control_sock = connect_to_server(host, 21);
+    int control_sock = connecting_server(host, 21);
     if (control_sock < 0) {
         fprintf(stderr, "Failed to connect to FTP server\n");
         close(control_sock);
         return EXIT_FAILURE;
     }
 
-    int response_code = read_response_code(control_sock); // Initial server message
+    int response_code = read_code(control_sock); // Initial server message
     printf("Initial response code: %d\n", response_code);
 
     if(!response_code) { // Problems
         close(control_sock);
         return EXIT_FAILURE;
-    } else if(response_code == LOGIN_SUCCESSFULL_CODE) { // Already logged in
+    } else if(response_code == LOGIN_GOOD) { // Already logged in
         printf("Already Logged in \n");
-    } else if(response_code == LOGED_IN_CODE || response_code == 20) {
+    } else if(response_code == LOGED_IN || response_code == 20) { // 20 is a code that some servers give
         // Send login credentials
         char login_cmd[BUFFER_SIZE];
         snprintf(login_cmd, sizeof(login_cmd), "USER %s\r\n", user);
         write(control_sock, login_cmd, strlen(login_cmd));
-        int user_response = read_response_code(control_sock);
-        if (user_response != USERNAME_OK_PASSWORD_NOW && user_response != 31) {
+        int user_response = read_code(control_sock);
+        if (user_response != USERNAME_OK_PASSWORD_NOW && user_response != 31) { // 31 is a code that some servers give
             printf("Problems with username. Response code: %d\n", user_response);
             close(control_sock);
             return EXIT_FAILURE;
@@ -127,8 +115,8 @@ int main(int argc, char *argv[]) {
 
         snprintf(login_cmd, sizeof(login_cmd), "PASS %s\r\n", password);
         write(control_sock, login_cmd, strlen(login_cmd));
-        int pass_response = read_response_code(control_sock);
-        if (pass_response != LOGIN_SUCCESSFULL_CODE) {
+        int pass_response = read_code(control_sock);
+        if (pass_response != LOGIN_GOOD && pass_response != 30) { // 30 is a code that some servers give
             printf("Problems with password, won't give the loging sucessfull code. Response code: %d\n", pass_response);
             close(control_sock);
             return EXIT_FAILURE;
@@ -138,13 +126,13 @@ int main(int argc, char *argv[]) {
     // Enter passive mode and get data connection details
     char ip[BUFFER_SIZE];
     int data_port;
-    if (!enter_passive_mode(control_sock, ip, &data_port)) {
+    if (!passive_mode(control_sock, ip, &data_port)) {
         fprintf(stderr, "Failed to enter passive mode\n");
         close(control_sock);
         return EXIT_FAILURE;
     }
     
-    int data_sock = connect_to_server(ip, data_port);
+    int data_sock = connecting_server(ip, data_port);
     if (data_sock < 0) {
         fprintf(stderr, "Failed to connect to data socket\n");
         close(control_sock);
@@ -156,8 +144,8 @@ int main(int argc, char *argv[]) {
     char retr_cmd[BUFFER_SIZE];
     snprintf(retr_cmd, sizeof(retr_cmd), "RETR %s\r\n", filepath);
     write(control_sock, retr_cmd, strlen(retr_cmd));
-    int prov = read_response_code(control_sock);
-    if (prov != START_TRANSFER_CODE && prov != DATA_CONNECTION_ESTABLISHED_CODE) {
+    int prov = read_code(control_sock);
+    if (prov != START_TRANSFER && prov != DATA_CONNECTION_ESTABLISHED) {
         fprintf(stderr, "Failed to start file transfer\n");
         close(control_sock);
         close(data_sock);
@@ -166,15 +154,15 @@ int main(int argc, char *argv[]) {
 
 
     // Download the file using the extracted filename
-    download_file(data_sock, filename);
+    file_download(data_sock, filename);
 
     // Check if the file was downloaded successfully 
-    int response_code_sucess = read_response_code(control_sock);
+    int response_code_success = read_code(control_sock);
 
-    if (response_code_sucess == TRANSFER_COMPLETED_CODE) {
+    if (response_code_success == TRANSFER_COMPLETED) {
         printf("File transfer completed successfully.\n");
-    } else if (response_code_sucess != 1000) {
-        fprintf(stderr, "File transfer failed. Server response code: %d\n", response_code_sucess);
+    } else if (response_code_success != 1000) {
+        fprintf(stderr, "File transfer failed. Server response code: %d\n", response_code_success);
         close(control_sock);
         return EXIT_FAILURE;
     }
@@ -192,7 +180,7 @@ int main(int argc, char *argv[]) {
  * @param port : Port number to connect to
  * @return int : Socket file descriptor or -1 if an error occurred
  */
-int connect_to_server(const char *host, int port) {
+int connecting_server(const char *host, int port) {
     struct addrinfo hints; // Criteria for selecting socket addresses
     struct addrinfo *res;  // Where the result is saved
     struct addrinfo *prov2; // Pointer to iterate throung the list of potential addresses
@@ -239,9 +227,9 @@ int connect_to_server(const char *host, int port) {
  * @param response_len : Lenth of the response buffer
  * @return int : 0 if sucessfull and 1 if empty response
  */
-int read_response (int socket, char * response, int response_len){
+int read_response(int socket, char * response, int response_len){
     int total_bytes_read = 0, bytes_read = 0; // Where the number of total and partial bytes read will be saved
-    int n_tries = NUM_TRIES; // Numbered of tries
+    int n_tries = NUMBER_TRIES; // Numbered of tries
     usleep(100000); // Wait for a bit to ensure it can start with no problems
 
     // Read form server while number of tries > 0
@@ -249,16 +237,16 @@ int read_response (int socket, char * response, int response_len){
         // Try to read data from the socket
         bytes_read = recv(socket, response + total_bytes_read,response_len - total_bytes_read, MSG_DONTWAIT);
         
-        if(bytes_read <= 0) { // Error, no bytes read
+        if (bytes_read <= 0) { // Error, no bytes read
             n_tries--;
             usleep(100000);
         } else { // Could read bytes, yay
-            n_tries = NUM_TRIES;
+            n_tries = NUMBER_TRIES;
         }
 
         // Accumulate the total bytes read 
         total_bytes_read += bytes_read;
-        bytes_read = 0; // Clean before next iteration in case of problems
+        bytes_read = 0;
     }
 
     response[total_bytes_read] = '\0';
@@ -279,11 +267,11 @@ int read_response (int socket, char * response, int response_len){
  * @param socket : Socket file descriptor
  * @return int : Response code
  */
-int read_response_code(int socket){
-    char response [BUFFER_SIZE]; // Buffer to save the response
-    int response_code = 0; // Parsed response code
+int read_code(int socket){
+    char response [BUFFER_SIZE];
+    int response_code = 0;
 
-    int sucess = read_response(socket, response, BUFFER_SIZE); // Read the response
+    int sucess = read_response(socket, response, BUFFER_SIZE);
     if (sucess == 1) { // If empty response
         return 1000; // Is not a valid response code, chosen by us
     }
@@ -302,11 +290,11 @@ int read_response_code(int socket){
  * @param port : Port
  * @return int : 1 on success and 0 on error
  */
-int enter_passive_mode(int sockfd, char *ip, int *port) {
+int passive_mode(int sockfd, char *ip, int *port) {
     char buffer[BUFFER_SIZE]; // Buffer to save the response
 
     write(sockfd, "PASV\r\n", 6); // Send PASV command to enter passive mode
-    read_response(sockfd, buffer, BUFFER_SIZE);  // Get the response
+    read_response(sockfd, buffer, BUFFER_SIZE);  
 
     // Parse the response to extract the IP and port information
     int val1, val2, val3, val4, p1, p2;
@@ -333,10 +321,10 @@ int enter_passive_mode(int sockfd, char *ip, int *port) {
  * @param data_sock : Data socket
  * @param filename : File name
  */
-void download_file(int data_sock, const char *filename) {
+void file_download(int data_sock, const char *filename) {
     FILE *file = fopen(filename, "wb"); // Open file in wb mode
 
-    if (!file) { // Problems opening the file
+    if (!file) {
         perror("Error opening file");
         return;
     }
@@ -349,8 +337,8 @@ void download_file(int data_sock, const char *filename) {
         fwrite(buffer, 1, bytes_read, file);
     }
 
-    fclose(file); // Close file
-    close(data_sock); // Close data socket
+    fclose(file);
+    close(data_sock);
 }
 
 
@@ -376,28 +364,28 @@ const char *get_filename(const char *path) {
  * @param path : Where the path will be stored
  * @return int : Return 0 indicating successful parsing
  */
-int parse_url(char * url, char * username, char * password, char * host, char * path){
-    char *aux = NULL; // auxiliar
+int url_parse(char * url, char * username, char * password, char * host, char * path){
+    char *aux = NULL;
 
-    // Find the @ is there is any -> it has a username and a password
-    sscanf(url,AT,aux);
+    // Find the @ is there is any -> 
+    sscanf(url,EXTRACT_AT,aux);
 
     if(sscanf(url, "%*[^@]@%c", &aux) == 1){  // Extract the username if any
-        sscanf(url,USER_REGEX,username);
+        sscanf(url,EXTRACT_USER,username);
     }
 
     if(username[0]!='\0') { // If username extracted then try extracting the password
-        sscanf(url,PASS_REGEX,password);
+        sscanf(url,EXTRACT_PASS,password);
     }
 
     if(username[0]!='\0') { // if there exists an username (and password), extract the host
-        sscanf(url, HOST_AT_REGEX, host);
+        sscanf(url, EXTRACT_HOST_AT, host);
     } else { // if no username, extract the host
-        sscanf(url, HOST_REGEX, host);
+        sscanf(url, EXTRACT_HOST, host);
     }
 
     // Extract the path
-    sscanf(url, PATH_REGEX, path);
+    sscanf(url, EXTRACT_PATH, path);
    
     return 0;
 }

@@ -121,6 +121,7 @@ no tux3: (deve responder)
 deu certo o router : done/not done
 
 --------------------------------------------------------------------------
+nameserver 172.16.1.1 ??????????
 
 final -> No Tux??3, fazer o download de um ficheiro do servidor FTP.
 
