@@ -8,7 +8,7 @@
 
 #define BUFFER_SIZE 1024
 
-#define LOGED_IN 220 // Some servers cut the code and only return 20
+#define LOGGED_IN 220 // Some servers cut the code and only return 20
 #define USERNAME_OK_PASSWORD_NOW 331 // Some servers cut the code and only return 31
 #define LOGIN_GOOD 230 // Some servers cut the code and only return 30
 #define START_TRANSFER 150
@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     } else if(response_code == LOGIN_GOOD) { // Already logged in
         printf("Already Logged in \n");
-    } else if(response_code == LOGED_IN || response_code == 20) { // 20 is a code that some servers give
+    } else if(response_code == LOGGED_IN || response_code == 20) { // 20 is a code that some servers give
         // Send login credentials
         char login_cmd[BUFFER_SIZE];
         snprintf(login_cmd, sizeof(login_cmd), "USER %s\r\n", user);
@@ -224,7 +224,7 @@ int connecting_server(const char *host, int port) {
  * 
  * @param socket : Socket file descriptor
  * @param response : Where the response will be saved
- * @param response_len : Lenth of the response buffer
+ * @param response_len : Length of the response buffer
  * @return int : 0 if sucessfull and 1 if empty response
  */
 int read_response(int socket, char * response, int response_len){
