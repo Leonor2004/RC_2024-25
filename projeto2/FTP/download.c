@@ -24,7 +24,7 @@
 #define EXTRACT_PASS     "%*[^/]//%*[^:]:%[^@\n$]"
 #define EXTRACT_PASSIVE  "%*[^(](%d,%d,%d,%d,%d,%d)%*[^\n$)]"
 
-// Function prototypes
+// Functions
 int connecting_server(const char *host, int port);
 int read_code(int sockfd);
 int read_response (int socket, char * response, int response_len);
