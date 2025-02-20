@@ -9,7 +9,6 @@ RCom Project
 - **Tools:** C
 - **Institution:** [FEUP](https://sigarra.up.pt/feup/en/web_page.Inicial)
 - **Course:** [RCom](https://sigarra.up.pt/feup/en/UCURR_GERAL.FICHA_UC_VIEW?pv_ocorrencia_id=541890) (Computer Networks)
-- **Project grade:** ???
 - **Group members:**
   - Afonso Castro (up202208026@up.pt),
   - Leonor Couto (up202205796@up.pt).
